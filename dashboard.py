@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ── Dark theme CSS ─────────────────────────────────────────────────────────────
+# ── Light theme CSS ────────────────────────────────────────────────────────────
 st.markdown(
     """
     <style>
@@ -23,8 +23,8 @@ st.markdown(
     [data-testid="stAppViewContainer"],
     [data-testid="stApp"],
     .main, .block-container {
-        background-color: #0e0e0e !important;
-        color: #e8e8e8 !important;
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
         font-family: "IBM Plex Sans", "Inter", "Helvetica Neue", sans-serif !important;
     }
     section[data-testid="stSidebar"] { display: none !important; }
@@ -38,8 +38,8 @@ st.markdown(
     h1.rq {
         font-size: 1.05rem;
         font-weight: 600;
-        color: #e8e8e8;
-        border-left: 3px solid #555555;
+        color: #1a1a1a;
+        border-left: 3px solid #bbbbbb;
         padding-left: 0.75rem;
         margin: 0 0 0.2rem 0;
         line-height: 1.5;
@@ -52,9 +52,9 @@ st.markdown(
         font-weight: 700;
         letter-spacing: 0.14em;
         text-transform: uppercase;
-        color: #888888;
+        color: #555555;
         margin: 0 0 0.6rem 0;
-        border-bottom: 1px solid #222222;
+        border-bottom: 1px solid #dddddd;
         padding-bottom: 0.4rem;
     }
 
@@ -64,61 +64,61 @@ st.markdown(
         font-weight: 700;
         letter-spacing: 0.13em;
         text-transform: uppercase;
-        color: #666666;
+        color: #777777;
         margin-bottom: 0.2rem;
     }
 
     /* Warning box */
     .warn-box {
-        background: #1a1400;
-        border: 1px solid #7a5c00;
+        background: #fff8e1;
+        border: 1px solid #e6a800;
         border-radius: 2px;
         padding: 0.75rem 1rem;
         font-size: 0.82rem;
-        color: #f0c040;
+        color: #7a5c00;
         font-weight: 500;
     }
 
     /* Footer */
-    .footer-val { font-size: 0.85rem; color: #aaaaaa; margin-top: 0.1rem; }
+    .footer-val { font-size: 0.85rem; color: #444444; margin-top: 0.1rem; }
     .meta-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.12em;
-                  text-transform: uppercase; color: #555555; }
+                  text-transform: uppercase; color: #888888; }
 
     /* Divider */
-    hr { border-color: #1e1e1e !important; margin: 2rem 0 !important; }
+    hr { border-color: #e0e0e0 !important; margin: 2rem 0 !important; }
     hr.section-break {
-        border-color: #2a2a2a !important;
+        border-color: #cccccc !important;
         margin: 3.5rem 0 !important;
         border-width: 2px !important;
     }
 
-    /* All Streamlit text inputs dark */
+    /* All Streamlit text inputs light */
     div[data-baseweb="select"] > div,
     div[data-baseweb="popover"] {
-        background-color: #1a1a1a !important;
-        color: #e8e8e8 !important;
-        border-color: #2e2e2e !important;
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+        border-color: #dddddd !important;
     }
-    div[data-baseweb="option"]:hover { background-color: #252525 !important; }
+    div[data-baseweb="option"]:hover { background-color: #f0f0f0 !important; }
     span[data-baseweb="tag"] {
-        background-color: #272727 !important;
-        color: #e8e8e8 !important;
+        background-color: #e8e8e8 !important;
+        color: #1a1a1a !important;
     }
     label, .stRadio label, .stSelectbox label, .stMultiSelect label {
-        color: #e8e8e8 !important;
+        color: #1a1a1a !important;
     }
     .stRadio > div { gap: 0.4rem; }
-    p { color: #e8e8e8 !important; }
+    p { color: #1a1a1a !important; }
 
     /* Tab styling */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #0e0e0e !important;
-        border-bottom: 1px solid #222222 !important;
+        background-color: #ffffff !important;
+        border-bottom: 1px solid #dddddd !important;
         gap: 0.25rem;
     }
     .stTabs [data-baseweb="tab"] {
         background-color: transparent !important;
-        color: #666666 !important;
+        color: #888888 !important;
         font-size: 0.72rem !important;
         font-weight: 700 !important;
         letter-spacing: 0.12em !important;
@@ -128,12 +128,12 @@ st.markdown(
         border: none !important;
     }
     .stTabs [aria-selected="true"] {
-        color: #e8e8e8 !important;
-        border-bottom: 2px solid #e8e8e8 !important;
+        color: #1a1a1a !important;
+        border-bottom: 2px solid #1a1a1a !important;
         background-color: transparent !important;
     }
     .stTabs [data-baseweb="tab-panel"] {
-        background-color: #0e0e0e !important;
+        background-color: #ffffff !important;
         padding-top: 1.5rem !important;
     }
 
@@ -143,13 +143,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ── Plotly dark palette ────────────────────────────────────────────────────────
-BG_PLOT  = "#141414"
-BG_PAPER = "#0e0e0e"
-TEXT_CLR = "#e8e8e8"
-GRID_CLR = "#1e1e1e"
-LINE_CLR = "#2e2e2e"
-AXIS_CLR = "#444444"
+# ── Plotly light palette ───────────────────────────────────────────────────────
+BG_PLOT  = "#ffffff"
+BG_PAPER = "#ffffff"
+TEXT_CLR = "#1a1a1a"
+GRID_CLR = "#e8e8e8"
+LINE_CLR = "#cccccc"
+AXIS_CLR = "#666666"
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 DATA_FILE      = "Usage_Data/pseo_state_cohort_trends_agg34_deg5_cip11_13_51_clean.csv"
@@ -177,7 +177,7 @@ FLOW_NME_COLS = {
     10: "y10_grads_nme",
 }
 FLOW_GRANULAR_FILE = "Intermediary_Cleaned/pseo_sankey_granular.csv"
-INSTATE_COLOR = "#00ff88"
+INSTATE_COLOR = "#0a8f4f"
 FLOW_COUNT_COLS = {1: "y1_count", 5: "y5_count", 10: "y10_count"}
 
 MAJOR_PALETTES = {
@@ -213,15 +213,15 @@ INDUSTRY_COLORS = {
     "Other Services (except Public Administration)":                        "#515a5a",
     "Public Administration":                                                "#1f618d",
 }
-NME_COLOR    = "#3a3a3a"
+NME_COLOR    = "#bbbbbb"
 MAJOR_NODE_COLORS = {
     "Computer Science":  "#4a9fd4",
     "Education":         "#41ab5d",
     "Health Professions":"#f16913",
 }
 DIVISION_COLORS = [
-    "#4fc3f7","#29b6f6","#039be5","#0288d1",
-    "#0277bd","#01579b","#81d4fa","#b3e5fc","#e1f5fe",
+    "#0288d1","#0277bd","#01579b","#039be5",
+    "#1565c0","#0d47a1","#1976d2","#1e88e5","#2196f3",
 ]
 
 
@@ -302,14 +302,14 @@ def base_layout(title, subtitle):
         title=dict(
             text=(
                 f"<b style='color:{TEXT_CLR}'>{title}</b>"
-                f"<br><sup><span style='color:#aaaaaa'>{subtitle}</span></sup>"
+                f"<br><sup><span style='color:#777777'>{subtitle}</span></sup>"
             ),
             font=dict(size=22, color=TEXT_CLR),
             x=0, xanchor="left", pad=dict(b=18),
         ),
         xaxis=dict(
             tickfont=dict(size=16, color=TEXT_CLR),
-            title_font=dict(size=16, color="#aaaaaa"),
+            title_font=dict(size=16, color="#555555"),
             showgrid=False, showline=True,
             linecolor=LINE_CLR, ticks="outside",
             ticklen=5, tickcolor=AXIS_CLR, zeroline=False,
@@ -317,18 +317,18 @@ def base_layout(title, subtitle):
         yaxis=dict(
             tickformat="$,.0f",
             tickfont=dict(size=15, color=TEXT_CLR),
-            title_font=dict(size=16, color="#aaaaaa"),
+            title_font=dict(size=16, color="#555555"),
             showgrid=True, gridcolor=GRID_CLR, gridwidth=1,
             showline=True, linecolor=LINE_CLR,
             ticks="outside", ticklen=5, tickcolor=AXIS_CLR, zeroline=False,
         ),
         legend=dict(
             font=dict(size=15, color=TEXT_CLR),
-            bgcolor="#1a1a1a", bordercolor="#2e2e2e", borderwidth=1,
+            bgcolor="#f8f8f8", bordercolor="#dddddd", borderwidth=1,
             orientation="v", x=1.01, xanchor="left", y=1.0, yanchor="top",
         ),
         hoverlabel=dict(
-            bgcolor="#1e1e1e", bordercolor="#3a3a3a",
+            bgcolor="#ffffff", bordercolor="#cccccc",
             font=dict(color=TEXT_CLR, size=15),
         ),
         margin=dict(l=90, r=220, t=110, b=80),
@@ -542,7 +542,7 @@ def build_sankey(dff: pd.DataFrame, year: int, title: str,
         title=dict(
             text=(
                 f"<b style='color:{TEXT_CLR}'>{title}</b>"
-                f"<br><sup><span style='color:#aaaaaa'>"
+                f"<br><sup><span style='color:#777777'>"
                 f"{mode_subtitle.get(mode, '')} · "
                 f"Agg 178, Degree 05, CIP 11/13/51"
                 f"</span></sup>"
@@ -550,7 +550,7 @@ def build_sankey(dff: pd.DataFrame, year: int, title: str,
             font=dict(size=20, color=TEXT_CLR),
             x=0, xanchor="left", pad=dict(b=12),
         ),
-        hoverlabel=dict(bgcolor="#1e1e1e", bordercolor="#3a3a3a",
+        hoverlabel=dict(bgcolor="#ffffff", bordercolor="#cccccc",
                         font=dict(color=TEXT_CLR, size=14)),
         margin=dict(l=20, r=20, t=100, b=20),
         height=800,
@@ -568,7 +568,7 @@ st.markdown(
 )
 st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='font-size:0.78rem;color:#555555;margin:0'>PSEO — U.S. Census Bureau &nbsp;·&nbsp; "
+    "<p style='font-size:0.78rem;color:#888888;margin:0'>PSEO — U.S. Census Bureau &nbsp;·&nbsp; "
     "Aggregation level 34 / 178, Degree level 5 &nbsp;·&nbsp; CIP 11 / 13 / 51</p>",
     unsafe_allow_html=True,
 )
@@ -662,13 +662,13 @@ with tab_earnings:
         layout_b["bargap"]  = 0.15
         layout_b["bargroupgap"] = 0.04
         layout_b["xaxis"]["title"] = dict(text="Field of Study (CIP Category)",
-                                          font=dict(size=16, color="#aaaaaa"))
+                                          font=dict(size=16, color="#555555"))
         layout_b["yaxis"]["title"] = dict(text="Mean Annual Earnings (USD)",
-                                          font=dict(size=16, color="#aaaaaa"))
+                                          font=dict(size=16, color="#555555"))
         y_max = agg_b[["P25", "P50", "P75"]].max().max()
         layout_b["yaxis"]["range"] = [0, y_max * 1.25]
         layout_b["legend"]["title"] = dict(text="Major — Percentile",
-                                           font=dict(size=14, color="#aaaaaa"))
+                                           font=dict(size=14, color="#555555"))
         fig_bar.update_layout(**layout_b)
         st.plotly_chart(fig_bar, use_container_width=True)
 
@@ -774,13 +774,13 @@ with tab_earnings:
 
         layout_l = base_layout(l_title, l_sub)
         layout_l["xaxis"]["title"] = dict(text="Years Post-Graduation",
-                                          font=dict(size=11, color="#888888"))
+                                          font=dict(size=11, color="#555555"))
         layout_l["xaxis"]["categoryorder"] = "array"
         layout_l["xaxis"]["categoryarray"] = ["1 Yr Post-Grad", "5 Yrs Post-Grad", "10 Yrs Post-Grad"]
         layout_l["yaxis"]["title"] = dict(text="Mean Annual Earnings (USD)",
-                                          font=dict(size=11, color="#888888"))
+                                          font=dict(size=11, color="#555555"))
         layout_l["legend"]["title"] = dict(text="Field of Study",
-                                           font=dict(size=10, color="#888888"))
+                                           font=dict(size=10, color="#555555"))
 
         all_vals = line_df["value"].dropna()
         if not all_vals.empty:
@@ -928,13 +928,13 @@ with tab_earnings:
 
         layout_c = base_layout(c_title, c_sub)
         layout_c["xaxis"]["title"] = dict(text="Graduation Cohort",
-                                          font=dict(size=11, color="#888888"))
+                                          font=dict(size=11, color="#555555"))
         layout_c["xaxis"]["tickangle"] = -40
         layout_c["xaxis"]["tickfont"]  = dict(size=9, color=TEXT_CLR)
         layout_c["yaxis"]["title"] = dict(text="Mean Annual Earnings (USD)",
-                                          font=dict(size=11, color="#888888"))
+                                          font=dict(size=11, color="#555555"))
         layout_c["legend"]["title"] = dict(text="Major — Post-Grad Year",
-                                           font=dict(size=10, color="#888888"))
+                                           font=dict(size=10, color="#555555"))
         layout_c["height"] = 750
         layout_c["margin"]["b"] = 90
 
@@ -955,7 +955,7 @@ with tab_earnings:
     st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
     st.markdown("<hr class='section-break'>", unsafe_allow_html=True)
     st.markdown(
-        "<p style='font-size:0.68rem;color:#3a3a3a;text-align:center;margin:0'>"
+        "<p style='font-size:0.68rem;color:#aaaaaa;text-align:center;margin:0'>"
         "Post-Secondary Employment Outcomes (PSEO) · U.S. Census Bureau · "
         "CIP 11 Computer Science · CIP 13 Education · CIP 51 Healthcare"
         "</p>",
@@ -1103,7 +1103,7 @@ with tab_flows:
 
     st.markdown("<hr>", unsafe_allow_html=True)
     st.markdown(
-        "<p style='font-size:0.68rem;color:#3a3a3a;text-align:center;margin:0'>"
+        "<p style='font-size:0.68rem;color:#aaaaaa;text-align:center;margin:0'>"
         "Post-Secondary Employment Outcomes (PSEO) · U.S. Census Bureau · "
         "Agg Level 178 · CIP 11 Computer Science · CIP 13 Education · CIP 51 Healthcare"
         "</p>",
@@ -1116,11 +1116,11 @@ with tab_reg:
     # ── Constants for this tab ────────────────────────────────────────────────
     REG_CIP_LABEL = {"11": "Computer Science", "13": "Education", "51": "Nursing"}
     REG_CIP_COLORS = {
-        "Computer Science": "#00d4ff",
-        "Education":        "#ff4b4b",
-        "Nursing":          "#00ff88",
+        "Computer Science": "#0077b6",
+        "Education":        "#d32f2f",
+        "Nursing":          "#2e7d32",
     }
-    BASELINE_COLOR = "#555555"
+    BASELINE_COLOR = "#aaaaaa"
     REG_PCT_OPTIONS = {
         "p25 (Low-End)":   "p25",
         "p50 (Median)":    "p50",
@@ -1130,12 +1130,12 @@ with tab_reg:
 
     # ── Header ────────────────────────────────────────────────────────────────
     st.markdown(
-        "<h2 style='font-size:1.6rem; font-weight:700; color:#e8e8e8; margin-bottom:0.2rem;'>"
+        "<h2 style='font-size:1.6rem; font-weight:700; color:#1a1a1a; margin-bottom:0.2rem;'>"
         "The Career-Span Gap: Regression-Adjusted Premiums</h2>",
         unsafe_allow_html=True,
     )
     st.markdown(
-        "<p style='color:#888888; font-size:0.92rem; margin-top:0; margin-bottom:1.8rem;'>"
+        "<p style='color:#555555; font-size:0.92rem; margin-top:0; margin-bottom:1.8rem;'>"
         "By controlling for geography and graduation cohort, we isolate the pure market "
         "value of each degree across a 10-year career horizon.</p>",
         unsafe_allow_html=True,
@@ -1259,14 +1259,14 @@ with tab_reg:
             title=dict(
                 text=(
                     f"<b style='color:{TEXT_CLR}'>Wage Premium vs. Agriculture (CIP 01) — {pct_title}</b>"
-                    f"<br><sup><span style='color:#aaaaaa'>OLS β coefficients · "
+                    f"<br><sup><span style='color:#777777'>OLS β coefficients · "
                     f"State & cohort fixed effects · 763 observations</span></sup>"
                 ),
                 font=dict(size=20, color=TEXT_CLR),
                 x=0, xanchor="left", pad=dict(b=18),
             ),
             xaxis=dict(
-                title=dict(text="Years After Graduation", font=dict(size=14, color="#888888")),
+                title=dict(text="Years After Graduation", font=dict(size=14, color="#555555")),
                 tickfont=dict(size=15, color=TEXT_CLR),
                 showgrid=False, showline=True,
                 linecolor=LINE_CLR, ticks="outside",
@@ -1275,22 +1275,22 @@ with tab_reg:
                 categoryarray=["1 Yr Post-Grad", "5 Yrs Post-Grad", "10 Yrs Post-Grad"],
             ),
             yaxis=dict(
-                title=dict(text="Wage Premium (USD)", font=dict(size=14, color="#888888")),
+                title=dict(text="Wage Premium (USD)", font=dict(size=14, color="#555555")),
                 tickformat="$+,.0f",
                 tickfont=dict(size=14, color=TEXT_CLR),
                 dtick=10000,
                 showgrid=True, gridcolor=GRID_CLR, gridwidth=1,
                 showline=True, linecolor=LINE_CLR,
                 ticks="outside", ticklen=5, tickcolor=AXIS_CLR,
-                zeroline=True, zerolinecolor="#444444", zerolinewidth=1,
+                zeroline=True, zerolinecolor="#cccccc", zerolinewidth=1,
             ),
             legend=dict(
                 font=dict(size=14, color=TEXT_CLR),
-                bgcolor="#1a1a1a", bordercolor="#2e2e2e", borderwidth=1,
+                bgcolor="#f8f8f8", bordercolor="#dddddd", borderwidth=1,
                 orientation="v", x=1.01, xanchor="left", y=1.0, yanchor="top",
             ),
             hoverlabel=dict(
-                bgcolor="#1e1e1e", bordercolor="#3a3a3a",
+                bgcolor="#ffffff", bordercolor="#cccccc",
                 font=dict(color=TEXT_CLR, size=14),
             ),
             margin=dict(l=90, r=200, t=110, b=80),
@@ -1338,7 +1338,7 @@ with tab_reg:
 
     st.markdown("<hr>", unsafe_allow_html=True)
     st.markdown(
-        "<p style='font-size:0.68rem;color:#3a3a3a;text-align:center;margin:0'>"
+        "<p style='font-size:0.68rem;color:#aaaaaa;text-align:center;margin:0'>"
         "Post-Secondary Employment Outcomes (PSEO) · U.S. Census Bureau · "
         "OLS coefficients with State & Cohort suppression · "
         "CIP 01 Agriculture (Baseline) · CIP 11 Computer Science · "

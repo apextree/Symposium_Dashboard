@@ -31,7 +31,7 @@ st.markdown(
 
     .block-container {
         padding: 2.5rem 3rem !important;
-        max-width: 1440px !important;
+        max-width: 1600px !important;
     }
 
     /* Research question */
@@ -86,6 +86,11 @@ st.markdown(
 
     /* Divider */
     hr { border-color: #1e1e1e !important; margin: 2rem 0 !important; }
+    hr.section-break {
+        border-color: #2a2a2a !important;
+        margin: 3.5rem 0 !important;
+        border-width: 2px !important;
+    }
 
     /* All Streamlit text inputs dark */
     div[data-baseweb="select"] > div,
@@ -327,7 +332,7 @@ def base_layout(title, subtitle):
             font=dict(color=TEXT_CLR, size=15),
         ),
         margin=dict(l=90, r=220, t=110, b=80),
-        height=540,
+        height=750,
     )
 
 
@@ -548,7 +553,7 @@ def build_sankey(dff: pd.DataFrame, year: int, title: str,
         hoverlabel=dict(bgcolor="#1e1e1e", bordercolor="#3a3a3a",
                         font=dict(color=TEXT_CLR, size=14)),
         margin=dict(l=20, r=20, t=100, b=20),
-        height=700,
+        height=800,
     )
     return fig
 
@@ -661,7 +666,7 @@ with tab_earnings:
         layout_b["yaxis"]["title"] = dict(text="Mean Annual Earnings (USD)",
                                           font=dict(size=16, color="#aaaaaa"))
         y_max = agg_b[["P25", "P50", "P75"]].max().max()
-        layout_b["yaxis"]["range"] = [0, y_max * 1.15]
+        layout_b["yaxis"]["range"] = [0, y_max * 1.25]
         layout_b["legend"]["title"] = dict(text="Major — Percentile",
                                            font=dict(size=14, color="#aaaaaa"))
         fig_bar.update_layout(**layout_b)
@@ -678,7 +683,9 @@ with tab_earnings:
             st.markdown(f'<div class="meta-label">Cohorts in view</div>'
                         f'<div class="footer-val">{dff_b["grad_cohort_label"].nunique()}</div>', unsafe_allow_html=True)
 
-    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
+    st.markdown("<hr class='section-break'>", unsafe_allow_html=True)
+    st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
 
     # ── FIGURE 2 — Line chart: trajectory ────────────────────────────────────
     st.markdown('<h2 class="chart-title">Figure 2 &nbsp;·&nbsp; Earnings Trajectory Across Post-Graduation Years</h2>',
@@ -740,13 +747,17 @@ with tab_earnings:
             color  = MAJOR_COLOR[cip]
             xs     = [x_labels[y] for y in sub["year"]]
             ys     = sub["value"].tolist()
+            labels = [f"${v:,.0f}" for v in ys]
             fig_line.add_trace(go.Scatter(
                 name=short,
                 x=xs, y=ys,
-                mode="lines+markers",
+                mode="lines+markers+text",
                 line=dict(color=color, width=2.5),
                 marker=dict(color=color, size=8, symbol="circle",
                             line=dict(color=BG_PLOT, width=1.5)),
+                text=labels,
+                textposition="top center",
+                textfont=dict(size=12, color=color),
                 hovertemplate=(
                     f"<b>{short}</b><br>"
                     f"{PCT_LABELS[l_pct]}<br>"
@@ -771,6 +782,14 @@ with tab_earnings:
         layout_l["legend"]["title"] = dict(text="Field of Study",
                                            font=dict(size=10, color="#888888"))
 
+        all_vals = line_df["value"].dropna()
+        if not all_vals.empty:
+            y_lo, y_hi = all_vals.min(), all_vals.max()
+            span = y_hi - y_lo
+            if span > 0:
+                layout_l["yaxis"]["range"] = [y_lo - span * 0.20, y_hi + span * 0.20]
+                layout_l["yaxis"]["dtick"] = 5000
+
         fig_line.update_layout(**layout_l)
         st.plotly_chart(fig_line, use_container_width=True)
 
@@ -785,7 +804,9 @@ with tab_earnings:
             st.markdown(f'<div class="meta-label">Cohorts in view</div>'
                         f'<div class="footer-val">{dff_l["grad_cohort_label"].nunique()}</div>', unsafe_allow_html=True)
 
-    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
+    st.markdown("<hr class='section-break'>", unsafe_allow_html=True)
+    st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
 
     # ── FIGURE 3 — Line chart: cohorts ────────────────────────────────────────
     st.markdown(
@@ -875,14 +896,18 @@ with tab_earnings:
                 if agg_c["value"].isna().all():
                     continue
                 color = MAJOR_YEAR_COLORS.get((cip, yr), MAJOR_COLOR[cip])
+                labels = [f"${v:,.0f}" if pd.notna(v) else "" for v in agg_c["value"]]
                 fig_coh.add_trace(go.Scatter(
                     name=f"{short} — {YEAR_LABEL[yr]}",
                     x=agg_c["cohort"],
                     y=agg_c["value"],
-                    mode="lines+markers",
+                    mode="lines+markers+text",
                     line=dict(color=color, width=2, dash=DASH_STYLES[yr]),
                     marker=dict(color=color, size=6, symbol="circle",
                                 line=dict(color=BG_PLOT, width=1)),
+                    text=labels,
+                    textposition="top center",
+                    textfont=dict(size=10, color=color),
                     hovertemplate=(
                         f"<b>{short} · {YEAR_LABEL[yr]} Post-Grad</b><br>"
                         f"{PCT_LABELS[c_pct]}<br>"
@@ -910,7 +935,7 @@ with tab_earnings:
                                           font=dict(size=11, color="#888888"))
         layout_c["legend"]["title"] = dict(text="Major — Post-Grad Year",
                                            font=dict(size=10, color="#888888"))
-        layout_c["height"] = 540
+        layout_c["height"] = 750
         layout_c["margin"]["b"] = 90
 
         fig_coh.update_layout(**layout_c)
@@ -927,7 +952,8 @@ with tab_earnings:
             st.markdown(f'<div class="meta-label">Cohorts in view</div>'
                         f'<div class="footer-val">{len(cohort_order)}</div>', unsafe_allow_html=True)
 
-    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
+    st.markdown("<hr class='section-break'>", unsafe_allow_html=True)
     st.markdown(
         "<p style='font-size:0.68rem;color:#3a3a3a;text-align:center;margin:0'>"
         "Post-Secondary Employment Outcomes (PSEO) · U.S. Census Bureau · "
@@ -1116,7 +1142,7 @@ with tab_reg:
     )
 
     # ── Local filter ──────────────────────────────────────────────────────────
-    filt_col, chart_col = st.columns([1, 4])
+    filt_col, chart_col = st.columns([1, 5])
 
     with filt_col:
         st.markdown('<div class="f-label">Earnings Percentile</div>', unsafe_allow_html=True)
@@ -1176,6 +1202,8 @@ with tab_reg:
             hovertemplate="Agriculture (CIP 01)<br>Baseline: $0<extra></extra>",
         ))
 
+        all_reg_ys: list[float] = []
+
         for major_name in ["Computer Science", "Nursing", "Education"]:
             sub = dff_reg[dff_reg["major"] == major_name].sort_values("year_after")
             if sub.empty:
@@ -1184,8 +1212,8 @@ with tab_reg:
             xs = [x_label_map[y] for y in sub["year_after"]]
             ys = sub["Premium_USD"].tolist()
             pvals = sub["P_Value"].tolist()
+            all_reg_ys.extend(ys)
 
-            # Build significance stars for hover
             def _sig_label(p):
                 if p < 0.001:
                     return "*** (p < 0.001)"
@@ -1217,7 +1245,7 @@ with tab_reg:
                 ),
                 text=[f"${v:+,.0f}" for v in ys],
                 textposition="top center",
-                textfont=dict(size=12, color=color),
+                textfont=dict(size=13, color=color),
                 hovertemplate="%{customdata}<extra></extra>",
                 customdata=hover_texts,
             ))
@@ -1250,6 +1278,7 @@ with tab_reg:
                 title=dict(text="Wage Premium (USD)", font=dict(size=14, color="#888888")),
                 tickformat="$+,.0f",
                 tickfont=dict(size=14, color=TEXT_CLR),
+                dtick=10000,
                 showgrid=True, gridcolor=GRID_CLR, gridwidth=1,
                 showline=True, linecolor=LINE_CLR,
                 ticks="outside", ticklen=5, tickcolor=AXIS_CLR,
@@ -1265,8 +1294,16 @@ with tab_reg:
                 font=dict(color=TEXT_CLR, size=14),
             ),
             margin=dict(l=90, r=200, t=110, b=80),
-            height=560,
+            height=750,
         )
+
+        if all_reg_ys:
+            y_min_reg = min(all_reg_ys + [0])
+            y_max_reg = max(all_reg_ys + [0])
+            span = y_max_reg - y_min_reg
+            fig_reg.update_yaxes(
+                range=[y_min_reg - span * 0.15, y_max_reg + span * 0.30],
+            )
 
         st.plotly_chart(fig_reg, use_container_width=True)
 

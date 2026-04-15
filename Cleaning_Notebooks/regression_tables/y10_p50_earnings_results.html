@@ -1,0 +1,79 @@
+<table class="simpletable">
+<caption>OLS Regression Results</caption>
+<tr>
+  <th>Dep. Variable:</th>    <td>y10_p50_earnings</td> <th>  R-squared:         </th> <td>   0.757</td> 
+</tr>
+<tr>
+  <th>Model:</th>                   <td>OLS</td>       <th>  Adj. R-squared:    </th> <td>   0.754</td> 
+</tr>
+<tr>
+  <th>Method:</th>             <td>Least Squares</td>  <th>  F-statistic:       </th> <td>   204.9</td> 
+</tr>
+<tr>
+  <th>Date:</th>             <td>Tue, 14 Apr 2026</td> <th>  Prob (F-statistic):</th> <td>8.16e-118</td>
+</tr>
+<tr>
+  <th>Time:</th>                 <td>04:28:53</td>     <th>  Log-Likelihood:    </th> <td> -4297.6</td> 
+</tr>
+<tr>
+  <th>No. Observations:</th>      <td>   401</td>      <th>  AIC:               </th> <td>   8609.</td> 
+</tr>
+<tr>
+  <th>Df Residuals:</th>          <td>   394</td>      <th>  BIC:               </th> <td>   8637.</td> 
+</tr>
+<tr>
+  <th>Df Model:</th>              <td>     6</td>      <th>                     </th>     <td> </td>    
+</tr>
+<tr>
+  <th>Covariance Type:</th>      <td>nonrobust</td>    <th>                     </th>     <td> </td>    
+</tr>
+</table>
+<table class="simpletable">
+<tr>
+                  <td></td>                    <th>coef</th>     <th>std err</th>      <th>t</th>      <th>P>|t|</th>  <th>[0.025</th>    <th>0.975]</th>  
+</tr>
+<tr>
+  <th>Intercept</th>                        <td> 7.028e+04</td> <td> 1587.494</td> <td>   44.272</td> <td> 0.000</td> <td> 6.72e+04</td> <td> 7.34e+04</td>
+</tr>
+<tr>
+  <th>C(cipcode, Treatment("1"))[T.11]</th> <td>   3.9e+04</td> <td> 1581.411</td> <td>   24.661</td> <td> 0.000</td> <td> 3.59e+04</td> <td> 4.21e+04</td>
+</tr>
+<tr>
+  <th>C(cipcode, Treatment("1"))[T.13]</th> <td>-1.212e+04</td> <td> 1592.291</td> <td>   -7.612</td> <td> 0.000</td> <td>-1.53e+04</td> <td>-8989.617</td>
+</tr>
+<tr>
+  <th>C(cipcode, Treatment("1"))[T.51]</th> <td> 1.133e+04</td> <td> 1577.898</td> <td>    7.180</td> <td> 0.000</td> <td> 8226.973</td> <td> 1.44e+04</td>
+</tr>
+<tr>
+  <th>C(grad_cohort)[T.2004]</th>           <td> 3059.9381</td> <td> 1655.024</td> <td>    1.849</td> <td> 0.065</td> <td> -193.845</td> <td> 6313.721</td>
+</tr>
+<tr>
+  <th>C(grad_cohort)[T.2007]</th>           <td> 5602.6705</td> <td> 1628.388</td> <td>    3.441</td> <td> 0.001</td> <td> 2401.255</td> <td> 8804.086</td>
+</tr>
+<tr>
+  <th>C(grad_cohort)[T.2010]</th>           <td> 7880.4949</td> <td> 1570.204</td> <td>    5.019</td> <td> 0.000</td> <td> 4793.470</td> <td>  1.1e+04</td>
+</tr>
+<tr>
+  <th>C(grad_cohort)[T.2013]</th>           <td>         0</td> <td>        0</td> <td>      nan</td> <td>   nan</td> <td>        0</td> <td>        0</td>
+</tr>
+<tr>
+  <th>C(grad_cohort)[T.2016]</th>           <td>         0</td> <td>        0</td> <td>      nan</td> <td>   nan</td> <td>        0</td> <td>        0</td>
+</tr>
+<tr>
+  <th>C(grad_cohort)[T.2019]</th>           <td>         0</td> <td>        0</td> <td>      nan</td> <td>   nan</td> <td>        0</td> <td>        0</td>
+</tr>
+</table>
+<table class="simpletable">
+<tr>
+  <th>Omnibus:</th>       <td>262.396</td> <th>  Durbin-Watson:     </th> <td>   1.466</td>
+</tr>
+<tr>
+  <th>Prob(Omnibus):</th> <td> 0.000</td>  <th>  Jarque-Bera (JB):  </th> <td>5975.228</td>
+</tr>
+<tr>
+  <th>Skew:</th>          <td> 2.368</td>  <th>  Prob(JB):          </th> <td>    0.00</td>
+</tr>
+<tr>
+  <th>Kurtosis:</th>      <td>21.308</td>  <th>  Cond. No.          </th> <td>     inf</td>
+</tr>
+</table><br/><br/>Notes:<br/>[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.<br/>[2] The smallest eigenvalue is      0. This might indicate that there are<br/>strong multicollinearity problems or that the design matrix is singular.

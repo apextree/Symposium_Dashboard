@@ -1,0 +1,1246 @@
+"""
+PSEO Earnings Dashboard
+Run with: streamlit run dashboard.py
+"""
+
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+
+# ── Page config ────────────────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="PSEO Earnings Dashboard",
+    page_icon=None,
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+# ── Dark theme CSS ─────────────────────────────────────────────────────────────
+st.markdown(
+    """
+    <style>
+    html, body,
+    [data-testid="stAppViewContainer"],
+    [data-testid="stApp"],
+    .main, .block-container {
+        background-color: #0e0e0e !important;
+        color: #e8e8e8 !important;
+        font-family: "IBM Plex Sans", "Inter", "Helvetica Neue", sans-serif !important;
+    }
+    section[data-testid="stSidebar"] { display: none !important; }
+
+    .block-container {
+        padding: 2.5rem 3rem !important;
+        max-width: 1440px !important;
+    }
+
+    /* Research question */
+    h1.rq {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #e8e8e8;
+        border-left: 3px solid #555555;
+        padding-left: 0.75rem;
+        margin: 0 0 0.2rem 0;
+        line-height: 1.5;
+        letter-spacing: 0.01em;
+    }
+
+    /* Chart section title */
+    h2.chart-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #888888;
+        margin: 0 0 0.6rem 0;
+        border-bottom: 1px solid #222222;
+        padding-bottom: 0.4rem;
+    }
+
+    /* Filter label */
+    .f-label {
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        color: #666666;
+        margin-bottom: 0.2rem;
+    }
+
+    /* Warning box */
+    .warn-box {
+        background: #1a1400;
+        border: 1px solid #7a5c00;
+        border-radius: 2px;
+        padding: 0.75rem 1rem;
+        font-size: 0.82rem;
+        color: #f0c040;
+        font-weight: 500;
+    }
+
+    /* Footer */
+    .footer-val { font-size: 0.85rem; color: #aaaaaa; margin-top: 0.1rem; }
+    .meta-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.12em;
+                  text-transform: uppercase; color: #555555; }
+
+    /* Divider */
+    hr { border-color: #1e1e1e !important; margin: 2rem 0 !important; }
+
+    /* All Streamlit text inputs dark */
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="popover"] {
+        background-color: #1a1a1a !important;
+        color: #e8e8e8 !important;
+        border-color: #2e2e2e !important;
+    }
+    div[data-baseweb="option"]:hover { background-color: #252525 !important; }
+    span[data-baseweb="tag"] {
+        background-color: #272727 !important;
+        color: #e8e8e8 !important;
+    }
+    label, .stRadio label, .stSelectbox label, .stMultiSelect label {
+        color: #e8e8e8 !important;
+    }
+    .stRadio > div { gap: 0.4rem; }
+    p { color: #e8e8e8 !important; }
+
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #0e0e0e !important;
+        border-bottom: 1px solid #222222 !important;
+        gap: 0.25rem;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: transparent !important;
+        color: #666666 !important;
+        font-size: 0.72rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.12em !important;
+        text-transform: uppercase !important;
+        padding: 0.55rem 1.2rem !important;
+        border-radius: 0 !important;
+        border: none !important;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #e8e8e8 !important;
+        border-bottom: 2px solid #e8e8e8 !important;
+        background-color: transparent !important;
+    }
+    .stTabs [data-baseweb="tab-panel"] {
+        background-color: #0e0e0e !important;
+        padding-top: 1.5rem !important;
+    }
+
+    #MainMenu, footer, header { visibility: hidden; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ── Plotly dark palette ────────────────────────────────────────────────────────
+BG_PLOT  = "#141414"
+BG_PAPER = "#0e0e0e"
+TEXT_CLR = "#e8e8e8"
+GRID_CLR = "#1e1e1e"
+LINE_CLR = "#2e2e2e"
+AXIS_CLR = "#444444"
+
+# ── Constants ──────────────────────────────────────────────────────────────────
+DATA_FILE      = "Usage_Data/pseo_state_cohort_trends_agg34_deg5_cip11_13_51_clean.csv"
+FLOW_DATA_FILE = "Usage_Data/pseof_agg178_deg5_cip11_13_51_clean.csv"
+
+CIP_MAP   = {11: "Computer Science (CIP 11)", 13: "Education (CIP 13)", 51: "Healthcare (CIP 51)"}
+CIP_SHORT = {11: "CS", 13: "Education", 51: "Healthcare"}
+CIP_LABEL = {"11": "Computer Science", "13": "Education", "51": "Health Professions"}
+
+YEAR_COLS = {
+    1:  {"p25": "y1_p25_earnings",  "p50": "y1_p50_earnings",  "p75": "y1_p75_earnings"},
+    5:  {"p25": "y5_p25_earnings",  "p50": "y5_p50_earnings",  "p75": "y5_p75_earnings"},
+    10: {"p25": "y10_p25_earnings", "p50": "y10_p50_earnings", "p75": "y10_p75_earnings"},
+}
+YEARS_LABEL = {1: "1 Yr Post-Grad", 5: "5 Yrs Post-Grad", 10: "10 Yrs Post-Grad"}
+
+FLOW_EMP_COLS = {
+    1:  "y1_grads_emp",
+    5:  "y5_grads_emp",
+    10: "y10_grads_emp",
+}
+FLOW_NME_COLS = {
+    1:  "y1_grads_nme",
+    5:  "y5_grads_nme",
+    10: "y10_grads_nme",
+}
+
+MAJOR_PALETTES = {
+    11: ["#6baed6", "#2171b5", "#084594"],
+    13: ["#74c476", "#238b45", "#00441b"],
+    51: ["#fc8d59", "#d7301f", "#7f0000"],
+}
+MAJOR_COLOR = {11: "#4a9fd4", 13: "#41ab5d", 51: "#f16913"}
+
+PCT_OPTIONS = {"25th Percentile": "p25", "50th Percentile (Median)": "p50", "75th Percentile": "p75"}
+PCT_LABELS  = {"p25": "25th Pctl.", "p50": "50th Pctl. (Median)", "p75": "75th Pctl."}
+
+# 20 high-contrast industry colors (one per NAICS sector)
+INDUSTRY_COLORS = {
+    "Agriculture, Forestry, Fishing and Hunting":                          "#4e9a6e",
+    "Mining, Quarrying, and Oil and Gas Extraction":                       "#b5a642",
+    "Utilities":                                                            "#e07b39",
+    "Construction":                                                         "#c0392b",
+    "Manufacturing":                                                        "#8e44ad",
+    "Wholesale Trade":                                                      "#2980b9",
+    "Retail Trade":                                                         "#16a085",
+    "Transportation and Warehousing":                                       "#d35400",
+    "Information":                                                          "#2471a3",
+    "Finance and Insurance":                                                "#1abc9c",
+    "Real Estate and Rental and Leasing":                                  "#7d3c98",
+    "Professional, Scientific, and Technical Services":                    "#117a65",
+    "Management of Companies and Enterprises":                             "#6e2f80",
+    "Administrative and Support and Waste Management and Remediation Services": "#935116",
+    "Educational Services":                                                 "#1a5276",
+    "Health Care and Social Assistance":                                    "#922b21",
+    "Arts, Entertainment, and Recreation":                                  "#7b241c",
+    "Accommodation and Food Services":                                      "#784212",
+    "Other Services (except Public Administration)":                        "#515a5a",
+    "Public Administration":                                                "#1f618d",
+}
+NME_COLOR    = "#3a3a3a"
+MAJOR_NODE_COLORS = {
+    "Computer Science":  "#4a9fd4",
+    "Education":         "#41ab5d",
+    "Health Professions":"#f16913",
+}
+DIVISION_COLORS = [
+    "#4fc3f7","#29b6f6","#039be5","#0288d1",
+    "#0277bd","#01579b","#81d4fa","#b3e5fc","#e1f5fe",
+]
+
+
+# ── Load data ──────────────────────────────────────────────────────────────────
+@st.cache_data
+def load_data():
+    return pd.read_csv(DATA_FILE)
+
+@st.cache_data
+def load_flow_data():
+    df = pd.read_csv(
+        FLOW_DATA_FILE,
+        dtype={
+            "cipcode": str, "degree_level": str,
+            "geography": str, "industry": str,
+            "institution": str,
+        },
+    )
+    # Ensure state_name column exists (fallback if notebook hasn't been re-run)
+    if "state_name" not in df.columns:
+        try:
+            fips = pd.read_csv("Labels/label_fipsnum.csv", dtype={"geography": str})
+            fips = fips.rename(columns={"label": "state_name"})[["geography", "state_name"]]
+            df["_fips"] = df["institution"].astype(str).str.zfill(2)
+            df = df.merge(fips, left_on="_fips", right_on="geography", how="left", suffixes=("", "_fips"))
+            df = df.drop(columns=["_fips", "geography_fips"], errors="ignore")
+        except Exception:
+            df["state_name"] = df["institution"]
+    return df
+
+@st.cache_data
+def load_regression_coefficients():
+    """Load OLS regression coefficients (β premiums vs Agriculture baseline)."""
+    df = pd.read_csv("Cleaning_Notebooks/regression_coefficients.csv")
+    # Map numeric year labels to integers  (y1→1, y5→5, y10→10)
+    df["year_after"] = df["Year_Label"].str.replace("y", "").astype(int)
+    return df
+
+df       = load_data()
+df_flow  = load_flow_data()
+df_coef  = load_regression_coefficients()
+
+all_states       = sorted(df["state_name"].dropna().unique().tolist())
+all_cohorts      = sorted(df["grad_cohort_label"].dropna().unique().tolist())
+flow_states      = sorted(df_flow["state_name"].dropna().unique().tolist())
+flow_cohorts     = sorted(df_flow["grad_cohort_label"].dropna().unique().tolist())
+
+
+# ── Shared helpers ─────────────────────────────────────────────────────────────
+def apply_filters(base_df, cips, state, cohort):
+    out = base_df[base_df["cipcode"].isin(cips)].copy()
+    if state  != "All States Combined":  out = out[out["state_name"]        == state]
+    if cohort != "All Cohorts Combined": out = out[out["grad_cohort_label"] == cohort]
+    return out
+
+
+def base_layout(title, subtitle):
+    return dict(
+        plot_bgcolor=BG_PLOT,
+        paper_bgcolor=BG_PAPER,
+        font=dict(family="IBM Plex Sans, Inter, sans-serif", color=TEXT_CLR, size=16),
+        title=dict(
+            text=(
+                f"<b style='color:{TEXT_CLR}'>{title}</b>"
+                f"<br><sup><span style='color:#aaaaaa'>{subtitle}</span></sup>"
+            ),
+            font=dict(size=22, color=TEXT_CLR),
+            x=0, xanchor="left", pad=dict(b=18),
+        ),
+        xaxis=dict(
+            tickfont=dict(size=16, color=TEXT_CLR),
+            title_font=dict(size=16, color="#aaaaaa"),
+            showgrid=False, showline=True,
+            linecolor=LINE_CLR, ticks="outside",
+            ticklen=5, tickcolor=AXIS_CLR, zeroline=False,
+        ),
+        yaxis=dict(
+            tickformat="$,.0f",
+            tickfont=dict(size=15, color=TEXT_CLR),
+            title_font=dict(size=16, color="#aaaaaa"),
+            showgrid=True, gridcolor=GRID_CLR, gridwidth=1,
+            showline=True, linecolor=LINE_CLR,
+            ticks="outside", ticklen=5, tickcolor=AXIS_CLR, zeroline=False,
+        ),
+        legend=dict(
+            font=dict(size=15, color=TEXT_CLR),
+            bgcolor="#1a1a1a", bordercolor="#2e2e2e", borderwidth=1,
+            orientation="v", x=1.01, xanchor="left", y=1.0, yanchor="top",
+        ),
+        hoverlabel=dict(
+            bgcolor="#1e1e1e", bordercolor="#3a3a3a",
+            font=dict(color=TEXT_CLR, size=15),
+        ),
+        margin=dict(l=90, r=220, t=110, b=80),
+        height=540,
+    )
+
+
+# ── Sankey builder ─────────────────────────────────────────────────────────────
+def build_sankey(dff: pd.DataFrame, year: int, title: str) -> go.Figure:
+    """
+    Build a three-tier Sankey: Major → Industry → Census Division.
+    An NME node is added per major for graduates with no/marginal employment.
+    dff must be already filtered by state / cohort / majors.
+    """
+    emp_col = FLOW_EMP_COLS[year]
+    nme_col = FLOW_NME_COLS[year]
+
+    majors     = sorted(dff["major_label"].dropna().unique().tolist())
+    industries = sorted(dff["industry_label"].dropna().unique().tolist())
+    divisions  = sorted(dff["division_label"].dropna().unique().tolist())
+
+    # ── Node index map ─────────────────────────────────────────────────────────
+    node_labels = []
+    node_colors = []
+
+    # Tier 1: Majors
+    maj_idx = {}
+    for m in majors:
+        maj_idx[m] = len(node_labels)
+        node_labels.append(m)
+        node_colors.append(MAJOR_NODE_COLORS.get(m, "#888888"))
+
+    # NME nodes (one per major)
+    nme_idx = {}
+    for m in majors:
+        nme_idx[m] = len(node_labels)
+        node_labels.append(f"{m} — Not Observed / Marginal")
+        node_colors.append(NME_COLOR)
+
+    # Tier 2: Industries
+    ind_idx = {}
+    for ind in industries:
+        ind_idx[ind] = len(node_labels)
+        node_labels.append(ind)
+        node_colors.append(INDUSTRY_COLORS.get(ind, "#888888"))
+
+    # Tier 3: Divisions
+    div_idx = {}
+    for i, div in enumerate(divisions):
+        div_idx[div] = len(node_labels)
+        node_labels.append(div)
+        node_colors.append(DIVISION_COLORS[i % len(DIVISION_COLORS)])
+
+    sources, targets, values, customdata = [], [], [], []
+
+    # ── Tier 1 → Tier 2: Major → Industry ─────────────────────────────────────
+    # Each row is a unique (state, major, cohort, industry, division) observation.
+    # Summing over divisions gives total employment per (major, industry).
+    maj_ind = (
+        dff.groupby(["major_label", "industry_label"])[emp_col]
+        .sum(min_count=1)
+        .reset_index()
+        .dropna(subset=[emp_col])
+    )
+    for _, row in maj_ind.iterrows():
+        m   = row["major_label"]
+        ind = row["industry_label"]
+        val = float(row[emp_col])
+        if val <= 0:
+            continue
+        sources.append(maj_idx[m])
+        targets.append(ind_idx[ind])
+        values.append(val)
+        customdata.append(None)  # placeholder; filled after totals are known
+
+    # ── Major → NME ───────────────────────────────────────────────────────────
+    # NME is a single value per (institution, major, cohort) but is repeated in
+    # every (industry × division) row.  Deduplicate before summing.
+    nme_key_cols = [c for c in ["institution", "major_label", "grad_cohort"] if c in dff.columns]
+    nme_dedup = (
+        dff[nme_key_cols + [nme_col]]
+        .drop_duplicates(subset=nme_key_cols)
+        .dropna(subset=[nme_col])
+    )
+    nme_by_maj = (
+        nme_dedup.groupby("major_label")[nme_col]
+        .sum(min_count=1)
+        .reset_index()
+        .dropna(subset=[nme_col])
+    )
+    for _, row in nme_by_maj.iterrows():
+        m   = row["major_label"]
+        val = float(row[nme_col])
+        if val <= 0 or m not in maj_idx:
+            continue
+        sources.append(maj_idx[m])
+        targets.append(nme_idx[m])
+        values.append(val)
+        customdata.append(None)  # placeholder
+
+    # ── Compute Major node outflow totals from actual link values ──────────────
+    # Percentage = link_value / sum_of_all_outgoing_links_from_that_major_node
+    maj_out_total = {}
+    for s, v in zip(sources, values):
+        lbl = node_labels[s]
+        maj_out_total[lbl] = maj_out_total.get(lbl, 0) + v
+
+    # Back-fill placeholders for tier-1 links
+    for i in range(len(customdata)):
+        if customdata[i] is None:
+            src_lbl = node_labels[sources[i]]
+            tgt_lbl = node_labels[targets[i]]
+            val     = values[i]
+            total   = maj_out_total.get(src_lbl, 0)
+            pct     = (val / total * 100) if total > 0 else 0.0
+            customdata[i] = (
+                f"{src_lbl} → {tgt_lbl}<br>Count: {val:,.0f}<br>Percentage: {pct:.1f}%"
+            )
+
+    # ── Tier 2 → Tier 3: Industry → Division ──────────────────────────────────
+    ind_div = (
+        dff.groupby(["industry_label", "division_label"])[emp_col]
+        .sum(min_count=1)
+        .reset_index()
+        .dropna(subset=[emp_col])
+    )
+    # Compute totals from the grouped link values (not raw data) to stay consistent
+    ind_out_total = (
+        ind_div.groupby("industry_label")[emp_col]
+        .sum()
+        .to_dict()
+    )
+    for _, row in ind_div.iterrows():
+        ind = row["industry_label"]
+        div = row["division_label"]
+        val = float(row[emp_col])
+        if val <= 0:
+            continue
+        total = float(ind_out_total.get(ind, 0))
+        pct   = (val / total * 100) if total > 0 else 0.0
+        sources.append(ind_idx[ind])
+        targets.append(div_idx[div])
+        values.append(val)
+        customdata.append(f"{ind} → {div}<br>Count: {val:,.0f}<br>Percentage: {pct:.1f}%")
+
+    if not sources:
+        return None
+
+    # Link colors: inherit from source node with transparency
+    link_colors = []
+    for s in sources:
+        base = node_colors[s]
+        link_colors.append(base.replace("#", "rgba(").rstrip(")") if base.startswith("rgba") else
+                           f"rgba({int(base[1:3],16)},{int(base[3:5],16)},{int(base[5:7],16)},0.35)")
+
+    fig = go.Figure(go.Sankey(
+        arrangement="snap",
+        node=dict(
+            pad=18,
+            thickness=22,
+            line=dict(color="#000000", width=0.5),
+            label=node_labels,
+            color=node_colors,
+            hovertemplate="%{label}<br>Total flow: %{value:,.0f}<extra></extra>",
+        ),
+        link=dict(
+            source=sources,
+            target=targets,
+            value=values,
+            color=link_colors,
+            customdata=customdata,
+            hovertemplate="%{customdata}<extra></extra>",
+        ),
+    ))
+
+    fig.update_layout(
+        paper_bgcolor=BG_PAPER,
+        plot_bgcolor=BG_PAPER,
+        font=dict(
+            family="IBM Plex Sans, Inter, sans-serif",
+            color="#000000",   # bold black node labels
+            size=13,
+        ),
+        title=dict(
+            text=(
+                f"<b style='color:{TEXT_CLR}'>{title}</b>"
+                f"<br><sup><span style='color:#aaaaaa'>"
+                f"Major → Industry → Census Division &nbsp;·&nbsp; "
+                f"Agg 178, Degree 05, CIP 11/13/51"
+                f"</span></sup>"
+            ),
+            font=dict(size=20, color=TEXT_CLR),
+            x=0, xanchor="left", pad=dict(b=12),
+        ),
+        hoverlabel=dict(
+            bgcolor="#1e1e1e", bordercolor="#3a3a3a",
+            font=dict(color=TEXT_CLR, size=14),
+        ),
+        margin=dict(l=20, r=20, t=100, b=20),
+        height=700,
+    )
+    return fig
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Page header
+# ══════════════════════════════════════════════════════════════════════════════
+st.markdown(
+    '<h1 class="rq">What are the 1-year, 5-year, and 10-year post-graduation average salaries '
+    "for Computer Science, Education, and Healthcare majors?</h1>",
+    unsafe_allow_html=True,
+)
+st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
+st.markdown(
+    "<p style='font-size:0.78rem;color:#555555;margin:0'>PSEO — U.S. Census Bureau &nbsp;·&nbsp; "
+    "Aggregation level 34 / 178, Degree level 5 &nbsp;·&nbsp; CIP 11 / 13 / 51</p>",
+    unsafe_allow_html=True,
+)
+st.markdown("<hr>", unsafe_allow_html=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Tabs
+# ══════════════════════════════════════════════════════════════════════════════
+tab_earnings, tab_flows, tab_reg = st.tabs(["Earnings", "Employment Flows", "Economic Returns"])
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 1 — Earnings
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_earnings:
+
+    # ── FIGURE 1 — Bar chart ──────────────────────────────────────────────────
+    st.markdown('<h2 class="chart-title">Figure 1 &nbsp;·&nbsp; Earnings Distribution by Major</h2>',
+                unsafe_allow_html=True)
+
+    fc1, fc2, fc3, fc4 = st.columns([2, 2, 2, 2])
+    with fc1:
+        st.markdown('<div class="f-label">Major</div>', unsafe_allow_html=True)
+        b_majors = st.multiselect(
+            "b_major", options=list(CIP_SHORT.values()),
+            default=list(CIP_SHORT.values()), label_visibility="collapsed", key="b_major"
+        )
+    with fc2:
+        st.markdown('<div class="f-label">Years Post-Graduation</div>', unsafe_allow_html=True)
+        b_year_lbl = st.radio(
+            "b_year", options=["1 Year", "5 Years", "10 Years"],
+            index=0, label_visibility="collapsed", horizontal=True, key="b_year"
+        )
+        b_year = {"1 Year": 1, "5 Years": 5, "10 Years": 10}[b_year_lbl]
+    with fc3:
+        st.markdown('<div class="f-label">State</div>', unsafe_allow_html=True)
+        b_state = st.selectbox(
+            "b_state", options=["All States Combined"] + all_states,
+            index=0, label_visibility="collapsed", key="b_state"
+        )
+    with fc4:
+        st.markdown('<div class="f-label">Graduation Cohort</div>', unsafe_allow_html=True)
+        b_cohort = st.selectbox(
+            "b_cohort", options=["All Cohorts Combined"] + all_cohorts,
+            index=0, label_visibility="collapsed", key="b_cohort"
+        )
+
+    if not b_majors:
+        st.markdown(
+            '<div class="warn-box">⚠&nbsp; At least one major must be chosen.</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        b_cips = [k for k, v in CIP_SHORT.items() if v in b_majors]
+        dff_b  = apply_filters(df, b_cips, b_state, b_cohort)
+        cols_b = YEAR_COLS[b_year]
+        agg_b  = (
+            dff_b.groupby("cipcode")[list(cols_b.values())].mean().reset_index()
+            .rename(columns={cols_b["p25"]: "P25", cols_b["p50"]: "P50", cols_b["p75"]: "P75"})
+        )
+
+        PCTL_LABEL = {"P25": "25th Pctl.", "P50": "50th Pctl. (Median)", "P75": "75th Pctl."}
+        fig_bar = go.Figure()
+        for cip in sorted(b_cips):
+            row = agg_b[agg_b["cipcode"] == cip]
+            if row.empty:
+                continue
+            pal   = MAJOR_PALETTES[cip]
+            short = CIP_SHORT[cip]
+            for i, pct in enumerate(["P25", "P50", "P75"]):
+                val = float(row[pct].values[0]) if not row[pct].isna().all() else 0.0
+                fig_bar.add_trace(go.Bar(
+                    name=f"{short} — {PCTL_LABEL[pct]}",
+                    x=[CIP_MAP[cip]], y=[val],
+                    marker_color=pal[i],
+                    marker_line_color=BG_PLOT, marker_line_width=1.5,
+                    legendgroup=f"{cip}_{pct}",
+                    text=[f"${val:,.0f}"],
+                    textposition="inside",
+                    textfont=dict(size=14, color="#ffffff"),
+                    insidetextanchor="middle",
+                    hovertemplate=f"<b>{short}</b><br>{PCTL_LABEL[pct]}<br><b>${val:,.0f}</b><extra></extra>",
+                ))
+
+        b_major_str = " · ".join(CIP_SHORT[c] for c in sorted(b_cips))
+        b_title = f"{b_year_lbl} Post-Grad  |  {b_major_str}  |  {b_state}  |  Cohort: {b_cohort}"
+        b_sub   = f"Mean 25th, 50th & 75th percentile earnings · {b_state} · Cohort: {b_cohort}"
+
+        layout_b = base_layout(b_title, b_sub)
+        layout_b["barmode"] = "group"
+        layout_b["bargap"]  = 0.15
+        layout_b["bargroupgap"] = 0.04
+        layout_b["xaxis"]["title"] = dict(text="Field of Study (CIP Category)",
+                                          font=dict(size=16, color="#aaaaaa"))
+        layout_b["yaxis"]["title"] = dict(text="Mean Annual Earnings (USD)",
+                                          font=dict(size=16, color="#aaaaaa"))
+        y_max = agg_b[["P25", "P50", "P75"]].max().max()
+        layout_b["yaxis"]["range"] = [0, y_max * 1.15]
+        layout_b["legend"]["title"] = dict(text="Major — Percentile",
+                                           font=dict(size=14, color="#aaaaaa"))
+        fig_bar.update_layout(**layout_b)
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+        mc1, mc2, mc3 = st.columns(3)
+        with mc1:
+            st.markdown(f'<div class="meta-label">Rows in view</div>'
+                        f'<div class="footer-val">{len(dff_b):,}</div>', unsafe_allow_html=True)
+        with mc2:
+            st.markdown(f'<div class="meta-label">States in view</div>'
+                        f'<div class="footer-val">{dff_b["state_name"].nunique()}</div>', unsafe_allow_html=True)
+        with mc3:
+            st.markdown(f'<div class="meta-label">Cohorts in view</div>'
+                        f'<div class="footer-val">{dff_b["grad_cohort_label"].nunique()}</div>', unsafe_allow_html=True)
+
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+    # ── FIGURE 2 — Line chart: trajectory ────────────────────────────────────
+    st.markdown('<h2 class="chart-title">Figure 2 &nbsp;·&nbsp; Earnings Trajectory Across Post-Graduation Years</h2>',
+                unsafe_allow_html=True)
+
+    lc1, lc2, lc3, lc4 = st.columns([2, 2, 2, 2])
+    with lc1:
+        st.markdown('<div class="f-label">Major</div>', unsafe_allow_html=True)
+        l_majors = st.multiselect(
+            "l_major", options=list(CIP_SHORT.values()),
+            default=list(CIP_SHORT.values()), label_visibility="collapsed", key="l_major"
+        )
+    with lc2:
+        st.markdown('<div class="f-label">Percentile</div>', unsafe_allow_html=True)
+        l_pct_lbl = st.radio(
+            "l_pct", options=list(PCT_OPTIONS.keys()),
+            index=1, label_visibility="collapsed", horizontal=False, key="l_pct"
+        )
+        l_pct = PCT_OPTIONS[l_pct_lbl]
+    with lc3:
+        st.markdown('<div class="f-label">State</div>', unsafe_allow_html=True)
+        l_state = st.selectbox(
+            "l_state", options=["All States Combined"] + all_states,
+            index=0, label_visibility="collapsed", key="l_state"
+        )
+    with lc4:
+        st.markdown('<div class="f-label">Graduation Cohort</div>', unsafe_allow_html=True)
+        l_cohort = st.selectbox(
+            "l_cohort", options=["All Cohorts Combined"] + all_cohorts,
+            index=0, label_visibility="collapsed", key="l_cohort"
+        )
+
+    if not l_majors:
+        st.markdown(
+            '<div class="warn-box">⚠&nbsp; At least one major must be chosen.</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        l_cips = [k for k, v in CIP_SHORT.items() if v in l_majors]
+        dff_l  = apply_filters(df, l_cips, l_state, l_cohort)
+
+        records = []
+        for yr in [1, 5, 10]:
+            col_name = YEAR_COLS[yr][l_pct]
+            grp = dff_l.groupby("cipcode")[col_name].mean().reset_index()
+            grp["year"] = yr
+            grp.rename(columns={col_name: "value"}, inplace=True)
+            records.append(grp)
+        line_df = pd.concat(records, ignore_index=True)
+
+        x_labels = {1: "1 Yr Post-Grad", 5: "5 Yrs Post-Grad", 10: "10 Yrs Post-Grad"}
+
+        fig_line = go.Figure()
+        for cip in sorted(l_cips):
+            sub = line_df[line_df["cipcode"] == cip].sort_values("year")
+            if sub.empty or sub["value"].isna().all():
+                continue
+            short  = CIP_SHORT[cip]
+            color  = MAJOR_COLOR[cip]
+            xs     = [x_labels[y] for y in sub["year"]]
+            ys     = sub["value"].tolist()
+            fig_line.add_trace(go.Scatter(
+                name=short,
+                x=xs, y=ys,
+                mode="lines+markers",
+                line=dict(color=color, width=2.5),
+                marker=dict(color=color, size=8, symbol="circle",
+                            line=dict(color=BG_PLOT, width=1.5)),
+                hovertemplate=(
+                    f"<b>{short}</b><br>"
+                    f"{PCT_LABELS[l_pct]}<br>"
+                    "%{x}<br><b>$%{y:,.0f}</b><extra></extra>"
+                ),
+            ))
+
+        l_major_str = " · ".join(CIP_SHORT[c] for c in sorted(l_cips))
+        l_title = (
+            f"Earnings Trajectory — {PCT_LABELS[l_pct]}  |  {l_major_str}  |  "
+            f"{l_state}  |  Cohort: {l_cohort}"
+        )
+        l_sub = f"{PCT_LABELS[l_pct]} earnings at 1, 5, and 10 years · {l_state} · Cohort: {l_cohort}"
+
+        layout_l = base_layout(l_title, l_sub)
+        layout_l["xaxis"]["title"] = dict(text="Years Post-Graduation",
+                                          font=dict(size=11, color="#888888"))
+        layout_l["xaxis"]["categoryorder"] = "array"
+        layout_l["xaxis"]["categoryarray"] = ["1 Yr Post-Grad", "5 Yrs Post-Grad", "10 Yrs Post-Grad"]
+        layout_l["yaxis"]["title"] = dict(text="Mean Annual Earnings (USD)",
+                                          font=dict(size=11, color="#888888"))
+        layout_l["legend"]["title"] = dict(text="Field of Study",
+                                           font=dict(size=10, color="#888888"))
+
+        fig_line.update_layout(**layout_l)
+        st.plotly_chart(fig_line, use_container_width=True)
+
+        lm1, lm2, lm3 = st.columns(3)
+        with lm1:
+            st.markdown(f'<div class="meta-label">Rows in view</div>'
+                        f'<div class="footer-val">{len(dff_l):,}</div>', unsafe_allow_html=True)
+        with lm2:
+            st.markdown(f'<div class="meta-label">States in view</div>'
+                        f'<div class="footer-val">{dff_l["state_name"].nunique()}</div>', unsafe_allow_html=True)
+        with lm3:
+            st.markdown(f'<div class="meta-label">Cohorts in view</div>'
+                        f'<div class="footer-val">{dff_l["grad_cohort_label"].nunique()}</div>', unsafe_allow_html=True)
+
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+    # ── FIGURE 3 — Line chart: cohorts ────────────────────────────────────────
+    st.markdown(
+        '<h2 class="chart-title">Figure 3 &nbsp;·&nbsp; Earnings by Graduation Cohort</h2>',
+        unsafe_allow_html=True,
+    )
+
+    cc1, cc2, cc3, cc4 = st.columns([2, 2, 1.4, 2])
+    with cc1:
+        st.markdown('<div class="f-label">Major</div>', unsafe_allow_html=True)
+        c_majors = st.multiselect(
+            "c_major", options=list(CIP_SHORT.values()),
+            default=list(CIP_SHORT.values()), label_visibility="collapsed", key="c_major",
+        )
+    with cc2:
+        st.markdown('<div class="f-label">Percentile</div>', unsafe_allow_html=True)
+        c_pct_lbl = st.radio(
+            "c_pct", options=list(PCT_OPTIONS.keys()),
+            index=1, label_visibility="collapsed", horizontal=False, key="c_pct",
+        )
+        c_pct = PCT_OPTIONS[c_pct_lbl]
+    with cc3:
+        st.markdown('<div class="f-label">Years Post-Grad</div>', unsafe_allow_html=True)
+        c_years_sel = st.multiselect(
+            "c_years",
+            options=["1 Year", "5 Years", "10 Years"],
+            default=["1 Year", "5 Years", "10 Years"],
+            label_visibility="collapsed", key="c_years",
+        )
+        c_years_map = {"1 Year": 1, "5 Years": 5, "10 Years": 10}
+        c_years = [c_years_map[y] for y in c_years_sel]
+    with cc4:
+        st.markdown('<div class="f-label">State</div>', unsafe_allow_html=True)
+        c_state = st.selectbox(
+            "c_state", options=["All States Combined"] + all_states,
+            index=0, label_visibility="collapsed", key="c_state",
+        )
+
+    _warn_c = []
+    if not c_majors:
+        _warn_c.append("at least one major")
+    if not c_years:
+        _warn_c.append("at least one post-grad year")
+
+    if _warn_c:
+        st.markdown(
+            f'<div class="warn-box">⚠&nbsp; Please select {" and ".join(_warn_c)}.</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        c_cips = [k for k, v in CIP_SHORT.items() if v in c_majors]
+        dff_c = df[df["cipcode"].isin(c_cips)].copy()
+        if c_state != "All States Combined":
+            dff_c = dff_c[dff_c["state_name"] == c_state]
+
+        cohort_order = sorted(dff_c["grad_cohort_label"].dropna().unique().tolist())
+
+        DASH_STYLES = {1: "solid", 5: "dash", 10: "dot"}
+        YEAR_LABEL  = {1: "1 Yr", 5: "5 Yrs", 10: "10 Yrs"}
+
+        MAJOR_YEAR_COLORS = {
+            (11, 1):  "#6baed6",
+            (11, 5):  "#2171b5",
+            (11, 10): "#08306b",
+            (13, 1):  "#74c476",
+            (13, 5):  "#238b45",
+            (13, 10): "#00441b",
+            (51, 1):  "#fc8d59",
+            (51, 5):  "#d7301f",
+            (51, 10): "#67000d",
+        }
+
+        fig_coh = go.Figure()
+
+        for cip in sorted(c_cips):
+            sub_cip = dff_c[dff_c["cipcode"] == cip]
+            short   = CIP_SHORT[cip]
+            for yr in sorted(c_years):
+                col_name = YEAR_COLS[yr][c_pct]
+                agg_c = (
+                    sub_cip.groupby("grad_cohort_label")[col_name]
+                    .mean()
+                    .reindex(cohort_order)
+                    .reset_index()
+                    .rename(columns={col_name: "value", "grad_cohort_label": "cohort"})
+                )
+                if agg_c["value"].isna().all():
+                    continue
+                color = MAJOR_YEAR_COLORS.get((cip, yr), MAJOR_COLOR[cip])
+                fig_coh.add_trace(go.Scatter(
+                    name=f"{short} — {YEAR_LABEL[yr]}",
+                    x=agg_c["cohort"],
+                    y=agg_c["value"],
+                    mode="lines+markers",
+                    line=dict(color=color, width=2, dash=DASH_STYLES[yr]),
+                    marker=dict(color=color, size=6, symbol="circle",
+                                line=dict(color=BG_PLOT, width=1)),
+                    hovertemplate=(
+                        f"<b>{short} · {YEAR_LABEL[yr]} Post-Grad</b><br>"
+                        f"{PCT_LABELS[c_pct]}<br>"
+                        "Cohort: %{x}<br><b>$%{y:,.0f}</b><extra></extra>"
+                    ),
+                ))
+
+        c_major_str = " · ".join(CIP_SHORT[c] for c in sorted(c_cips))
+        c_years_str = " / ".join(YEAR_LABEL[y] for y in sorted(c_years))
+        c_title = (
+            f"Cohort Earnings — {PCT_LABELS[c_pct]}  |  {c_major_str}  |  "
+            f"{c_years_str} Post-Grad  |  {c_state}"
+        )
+        c_sub = (
+            f"{PCT_LABELS[c_pct]} mean earnings by graduation cohort · "
+            f"{c_state} · {c_years_str} post-graduation"
+        )
+
+        layout_c = base_layout(c_title, c_sub)
+        layout_c["xaxis"]["title"] = dict(text="Graduation Cohort",
+                                          font=dict(size=11, color="#888888"))
+        layout_c["xaxis"]["tickangle"] = -40
+        layout_c["xaxis"]["tickfont"]  = dict(size=9, color=TEXT_CLR)
+        layout_c["yaxis"]["title"] = dict(text="Mean Annual Earnings (USD)",
+                                          font=dict(size=11, color="#888888"))
+        layout_c["legend"]["title"] = dict(text="Major — Post-Grad Year",
+                                           font=dict(size=10, color="#888888"))
+        layout_c["height"] = 540
+        layout_c["margin"]["b"] = 90
+
+        fig_coh.update_layout(**layout_c)
+        st.plotly_chart(fig_coh, use_container_width=True)
+
+        cm1, cm2, cm3 = st.columns(3)
+        with cm1:
+            st.markdown(f'<div class="meta-label">Rows in view</div>'
+                        f'<div class="footer-val">{len(dff_c):,}</div>', unsafe_allow_html=True)
+        with cm2:
+            st.markdown(f'<div class="meta-label">States in view</div>'
+                        f'<div class="footer-val">{dff_c["state_name"].nunique()}</div>', unsafe_allow_html=True)
+        with cm3:
+            st.markdown(f'<div class="meta-label">Cohorts in view</div>'
+                        f'<div class="footer-val">{len(cohort_order)}</div>', unsafe_allow_html=True)
+
+    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown(
+        "<p style='font-size:0.68rem;color:#3a3a3a;text-align:center;margin:0'>"
+        "Post-Secondary Employment Outcomes (PSEO) · U.S. Census Bureau · "
+        "CIP 11 Computer Science · CIP 13 Education · CIP 51 Healthcare"
+        "</p>",
+        unsafe_allow_html=True,
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 2 — Employment Flows
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_flows:
+
+    st.markdown(
+        '<h2 class="chart-title">Employment Flows &nbsp;·&nbsp; Major → Industry → Census Division</h2>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Filters ───────────────────────────────────────────────────────────────
+    sf1, sf2, sf3, sf4 = st.columns([2, 2, 2, 2])
+
+    with sf1:
+        st.markdown('<div class="f-label">Source State</div>', unsafe_allow_html=True)
+        s_state = st.selectbox(
+            "s_state",
+            options=["All States"] + flow_states,
+            index=0,
+            label_visibility="collapsed",
+            key="s_state",
+        )
+
+    with sf2:
+        st.markdown('<div class="f-label">Majors</div>', unsafe_allow_html=True)
+        s_majors = st.multiselect(
+            "s_majors",
+            options=["Computer Science", "Education", "Health Professions"],
+            default=["Computer Science", "Education", "Health Professions"],
+            label_visibility="collapsed",
+            key="s_majors",
+        )
+
+    with sf3:
+        st.markdown('<div class="f-label">Graduation Cohort</div>', unsafe_allow_html=True)
+        s_cohort = st.selectbox(
+            "s_cohort",
+            options=["All Cohorts"] + flow_cohorts,
+            index=len(flow_cohorts),   # default to most recent cohort
+            label_visibility="collapsed",
+            key="s_cohort",
+        )
+
+    with sf4:
+        st.markdown('<div class="f-label">Time Milestone</div>', unsafe_allow_html=True)
+        s_year_lbl = st.radio(
+            "s_year",
+            options=["1 Year", "5 Years", "10 Years"],
+            index=1,
+            label_visibility="collapsed",
+            horizontal=True,
+            key="s_year",
+        )
+        s_year = {"1 Year": 1, "5 Years": 5, "10 Years": 10}[s_year_lbl]
+
+    # ── Filter data ───────────────────────────────────────────────────────────
+    dff_s = df_flow.copy()
+
+    if s_state != "All States":
+        dff_s = dff_s[dff_s["state_name"] == s_state]
+
+    if s_majors:
+        dff_s = dff_s[dff_s["major_label"].isin(s_majors)]
+
+    if s_cohort != "All Cohorts":
+        dff_s = dff_s[dff_s["grad_cohort_label"] == s_cohort]
+
+    # ── Render ────────────────────────────────────────────────────────────────
+    if not s_majors:
+        st.markdown(
+            '<div class="warn-box">⚠&nbsp; At least one major must be chosen.</div>',
+            unsafe_allow_html=True,
+        )
+    elif dff_s.empty:
+        st.markdown(
+            '<div class="warn-box">⚠&nbsp; No data available for the selected filters.</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        emp_col = FLOW_EMP_COLS[s_year]
+        has_emp = dff_s[emp_col].notna().any()
+        if not has_emp:
+            st.markdown(
+                f'<div class="warn-box">⚠&nbsp; All employment counts are suppressed '
+                f'for {s_year_lbl} post-graduation with the current filters.</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            maj_str    = " · ".join(s_majors)
+            cohort_str = s_cohort
+            state_str  = s_state
+            sk_title   = f"{s_year_lbl} Post-Grad  |  {maj_str}  |  {state_str}  |  Cohort: {cohort_str}"
+
+            fig_sk = build_sankey(dff_s, s_year, sk_title)
+            if fig_sk is None:
+                st.markdown(
+                    '<div class="warn-box">⚠&nbsp; Insufficient non-zero flow data to render diagram.</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.plotly_chart(fig_sk, use_container_width=True)
+
+            # Meta row
+            sm1, sm2, sm3, sm4 = st.columns(4)
+            with sm1:
+                st.markdown(f'<div class="meta-label">Rows in view</div>'
+                            f'<div class="footer-val">{len(dff_s):,}</div>', unsafe_allow_html=True)
+            with sm2:
+                st.markdown(f'<div class="meta-label">States in view</div>'
+                            f'<div class="footer-val">{dff_s["state_name"].nunique()}</div>', unsafe_allow_html=True)
+            with sm3:
+                st.markdown(f'<div class="meta-label">Industries</div>'
+                            f'<div class="footer-val">{dff_s["industry_label"].nunique()}</div>', unsafe_allow_html=True)
+            with sm4:
+                st.markdown(f'<div class="meta-label">Census Divisions</div>'
+                            f'<div class="footer-val">{dff_s["division_label"].nunique()}</div>', unsafe_allow_html=True)
+
+    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown(
+        "<p style='font-size:0.68rem;color:#3a3a3a;text-align:center;margin:0'>"
+        "Post-Secondary Employment Outcomes (PSEO) · U.S. Census Bureau · "
+        "Agg Level 178 · CIP 11 Computer Science · CIP 13 Education · CIP 51 Healthcare"
+        "</p>",
+        unsafe_allow_html=True,
+    )
+
+
+with tab_reg:
+
+    # ── Constants for this tab ────────────────────────────────────────────────
+    REG_CIP_LABEL = {"11": "Computer Science", "13": "Education", "51": "Nursing"}
+    REG_CIP_COLORS = {
+        "Computer Science": "#00d4ff",
+        "Education":        "#ff4b4b",
+        "Nursing":          "#00ff88",
+    }
+    BASELINE_COLOR = "#555555"
+    REG_PCT_OPTIONS = {
+        "p25 (Low-End)":   "p25",
+        "p50 (Median)":    "p50",
+        "p75 (Top-Tier)":  "p75",
+    }
+    REG_PCT_LABELS = {"p25": "25th Percentile", "p50": "50th Percentile", "p75": "75th Percentile"}
+
+    # ── Header ────────────────────────────────────────────────────────────────
+    st.markdown(
+        "<h2 style='font-size:1.6rem; font-weight:700; color:#e8e8e8; margin-bottom:0.2rem;'>"
+        "The Career-Span Gap: Regression-Adjusted Premiums</h2>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<p style='color:#888888; font-size:0.92rem; margin-top:0; margin-bottom:1.8rem;'>"
+        "By controlling for geography and graduation cohort, we isolate the pure market "
+        "value of each degree across a 10-year career horizon.</p>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Local filter ──────────────────────────────────────────────────────────
+    filt_col, chart_col = st.columns([1, 4])
+
+    with filt_col:
+        st.markdown('<div class="f-label">Earnings Percentile</div>', unsafe_allow_html=True)
+        reg_pct_lbl = st.selectbox(
+            "reg_pct",
+            options=list(REG_PCT_OPTIONS.keys()),
+            index=1,   # default to Median
+            label_visibility="collapsed",
+            key="reg_pct",
+        )
+        reg_pct = REG_PCT_OPTIONS[reg_pct_lbl]
+
+        st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
+
+        # # ── Insight text ──────────────────────────────────────────────────────
+        # st.markdown(
+        #     "<div style='border-left:3px solid #00d4ff; padding-left:0.75rem; margin-bottom:1.2rem;'>"
+        #     "<p style='font-size:0.82rem; color:#cccccc; font-weight:600; margin-bottom:0.3rem;'>"
+        #     "The Scissors Effect</p>"
+        #     "<p style='font-size:0.78rem; color:#999999; line-height:1.55;'>"
+        #     "Observe how technical premiums (CS / Nursing) <b style='color:#e8e8e8;'>accelerate</b> "
+        #     "with experience. In contrast, Education exhibits "
+        #     "<b style='color:#ff4b4b;'>Compressed Returns</b> — where the market fails to reward "
+        #     "10 years of experience with a significant wage increase.</p>"
+        #     "</div>",
+        #     unsafe_allow_html=True,
+        # )
+        # st.markdown(
+        #     "<div style='border-left:3px solid #888; padding-left:0.75rem;'>"
+        #     "<p style='font-size:0.82rem; color:#cccccc; font-weight:600; margin-bottom:0.3rem;'>"
+        #     "Statistical Rigor</p>"
+        #     "<p style='font-size:0.78rem; color:#999999; line-height:1.55;'>"
+        #     "P-values for STEM premiums are consistently "
+        #     "<b style='color:#00ff88;'>&lt; 0.001</b>, while the Education premium "
+        #     "often fails to reach statistical significance "
+        #     "(<span style='color:#ff4b4b;'>p &gt; 0.05</span>).</p>"
+        #     "</div>",
+        #     unsafe_allow_html=True,
+        # )
+
+    with chart_col:
+        # Filter coefficients for the selected percentile
+        dff_reg = df_coef[df_coef["Percentile"] == reg_pct].copy()
+        dff_reg["major"] = dff_reg["Major_Code"].astype(str).map(REG_CIP_LABEL)
+
+        x_label_map = {1: "1 Yr Post-Grad", 5: "5 Yrs Post-Grad", 10: "10 Yrs Post-Grad"}
+
+        fig_reg = go.Figure()
+
+        # Baseline (zero line for Agriculture)
+        fig_reg.add_trace(go.Scatter(
+            name="Agriculture (Baseline)",
+            x=["1 Yr Post-Grad", "5 Yrs Post-Grad", "10 Yrs Post-Grad"],
+            y=[0, 0, 0],
+            mode="lines",
+            line=dict(color=BASELINE_COLOR, width=1.5, dash="dash"),
+            hovertemplate="Agriculture (CIP 01)<br>Baseline: $0<extra></extra>",
+        ))
+
+        for major_name in ["Computer Science", "Nursing", "Education"]:
+            sub = dff_reg[dff_reg["major"] == major_name].sort_values("year_after")
+            if sub.empty:
+                continue
+            color = REG_CIP_COLORS[major_name]
+            xs = [x_label_map[y] for y in sub["year_after"]]
+            ys = sub["Premium_USD"].tolist()
+            pvals = sub["P_Value"].tolist()
+
+            # Build significance stars for hover
+            def _sig_label(p):
+                if p < 0.001:
+                    return "*** (p < 0.001)"
+                elif p < 0.01:
+                    return f"** (p = {p:.4f})"
+                elif p < 0.05:
+                    return f"* (p = {p:.4f})"
+                else:
+                    return f"n.s. (p = {p:.3f})"
+
+            hover_texts = [
+                f"<b>{major_name}</b><br>"
+                f"{REG_PCT_LABELS[reg_pct]}<br>"
+                f"{xs[i]}<br>"
+                f"Premium: <b>${ys[i]:+,.0f}</b><br>"
+                f"Significance: {_sig_label(pvals[i])}"
+                for i in range(len(xs))
+            ]
+
+            fig_reg.add_trace(go.Scatter(
+                name=major_name,
+                x=xs,
+                y=ys,
+                mode="lines+markers+text",
+                line=dict(color=color, width=3),
+                marker=dict(
+                    color=color, size=11, symbol="circle",
+                    line=dict(color=BG_PLOT, width=2),
+                ),
+                text=[f"${v:+,.0f}" for v in ys],
+                textposition="top center",
+                textfont=dict(size=12, color=color),
+                hovertemplate="%{customdata}<extra></extra>",
+                customdata=hover_texts,
+            ))
+
+        # Layout
+        pct_title = REG_PCT_LABELS[reg_pct]
+        fig_reg.update_layout(
+            plot_bgcolor=BG_PLOT,
+            paper_bgcolor=BG_PAPER,
+            font=dict(family="IBM Plex Sans, Inter, sans-serif", color=TEXT_CLR, size=16),
+            title=dict(
+                text=(
+                    f"<b style='color:{TEXT_CLR}'>Wage Premium vs. Agriculture (CIP 01) — {pct_title}</b>"
+                    f"<br><sup><span style='color:#aaaaaa'>OLS β coefficients · "
+                    f"State & cohort fixed effects · 763 observations</span></sup>"
+                ),
+                font=dict(size=20, color=TEXT_CLR),
+                x=0, xanchor="left", pad=dict(b=18),
+            ),
+            xaxis=dict(
+                title=dict(text="Years After Graduation", font=dict(size=14, color="#888888")),
+                tickfont=dict(size=15, color=TEXT_CLR),
+                showgrid=False, showline=True,
+                linecolor=LINE_CLR, ticks="outside",
+                ticklen=5, tickcolor=AXIS_CLR,
+                categoryorder="array",
+                categoryarray=["1 Yr Post-Grad", "5 Yrs Post-Grad", "10 Yrs Post-Grad"],
+            ),
+            yaxis=dict(
+                title=dict(text="Wage Premium (USD)", font=dict(size=14, color="#888888")),
+                tickformat="$+,.0f",
+                tickfont=dict(size=14, color=TEXT_CLR),
+                showgrid=True, gridcolor=GRID_CLR, gridwidth=1,
+                showline=True, linecolor=LINE_CLR,
+                ticks="outside", ticklen=5, tickcolor=AXIS_CLR,
+                zeroline=True, zerolinecolor="#444444", zerolinewidth=1,
+            ),
+            legend=dict(
+                font=dict(size=14, color=TEXT_CLR),
+                bgcolor="#1a1a1a", bordercolor="#2e2e2e", borderwidth=1,
+                orientation="v", x=1.01, xanchor="left", y=1.0, yanchor="top",
+            ),
+            hoverlabel=dict(
+                bgcolor="#1e1e1e", bordercolor="#3a3a3a",
+                font=dict(color=TEXT_CLR, size=14),
+            ),
+            margin=dict(l=90, r=200, t=110, b=80),
+            height=560,
+        )
+
+        st.plotly_chart(fig_reg, use_container_width=True)
+
+    # ── Footer meta row ───────────────────────────────────────────────────────
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+    rm1, rm2, rm3, rm4 = st.columns(4)
+    with rm1:
+        st.markdown(
+            '<div class="meta-label">Model Type</div>'
+            '<div class="footer-val">Multiple OLS Regression</div>',
+            unsafe_allow_html=True,
+        )
+    with rm2:
+        st.markdown(
+            '<div class="meta-label">Controls</div>'
+            '<div class="footer-val">State & Cohort Fixed Effects</div>',
+            unsafe_allow_html=True,
+        )
+    with rm3:
+        st.markdown(
+            '<div class="meta-label">Data N</div>'
+            '<div class="footer-val">763 Observations (Level 34)</div>',
+            unsafe_allow_html=True,
+        )
+    with rm4:
+        st.markdown(
+            '<div class="meta-label">Baseline</div>'
+            '<div class="footer-val">Agriculture (CIP 01)</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown(
+        "<p style='font-size:0.68rem;color:#3a3a3a;text-align:center;margin:0'>"
+        "Post-Secondary Employment Outcomes (PSEO) · U.S. Census Bureau · "
+        "OLS coefficients with State & Cohort suppression · "
+        "CIP 01 Agriculture (Baseline) · CIP 11 Computer Science · "
+        "CIP 13 Education · CIP 51 Nursing"
+        "</p>",
+        unsafe_allow_html=True,
+    )

@@ -247,7 +247,7 @@ def load_flow_data():
 @st.cache_data
 def load_regression_coefficients():
     """Load OLS regression coefficients (β premiums vs Agriculture baseline)."""
-    df = pd.read_csv("Cleaning_Notebooks/regression_coefficients.csv")
+    df = pd.read_csv("Regression/regression_coefficients.csv")
     # Map numeric year labels to integers  (y1→1, y5→5, y10→10)
     df["year_after"] = df["Year_Label"].str.replace("y", "").astype(int)
     return df

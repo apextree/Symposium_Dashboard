@@ -171,6 +171,9 @@ FLOW_NME_COLS = {
     5:  "y5_grads_nme",
     10: "y10_grads_nme",
 }
+FLOW_GRANULAR_FILE = "Intermediary_Cleaned/pseo_sankey_granular.csv"
+INSTATE_COLOR = "#00ff88"
+FLOW_COUNT_COLS = {1: "y1_count", 5: "y5_count", 10: "y10_count"}
 
 MAJOR_PALETTES = {
     11: ["#6baed6", "#2171b5", "#084594"],
@@ -245,6 +248,21 @@ def load_flow_data():
     return df
 
 @st.cache_data
+def load_flow_granular():
+    """Load expanded In-State / Out-of-State Sankey dataset (notebook Step 6)."""
+    for path in (FLOW_GRANULAR_FILE, "pseo_sankey_granular.csv"):
+        try:
+            return pd.read_csv(
+                path,
+                dtype={"cipcode": str, "geography": str,
+                       "industry": str, "institution": str},
+            )
+        except FileNotFoundError:
+            continue
+    return None
+
+
+@st.cache_data
 def load_regression_coefficients():
     """Load OLS regression coefficients (β premiums vs Agriculture baseline)."""
     df = pd.read_csv("Regression/regression_coefficients.csv")
@@ -252,9 +270,10 @@ def load_regression_coefficients():
     df["year_after"] = df["Year_Label"].str.replace("y", "").astype(int)
     return df
 
-df       = load_data()
-df_flow  = load_flow_data()
-df_coef  = load_regression_coefficients()
+df        = load_data()
+df_flow   = load_flow_data()
+df_flow_g = load_flow_granular()
+df_coef   = load_regression_coefficients()
 
 all_states       = sorted(df["state_name"].dropna().unique().tolist())
 all_cohorts      = sorted(df["grad_cohort_label"].dropna().unique().tolist())
@@ -313,196 +332,221 @@ def base_layout(title, subtitle):
 
 
 # ── Sankey builder ─────────────────────────────────────────────────────────────
-def build_sankey(dff: pd.DataFrame, year: int, title: str) -> go.Figure:
+def build_sankey(dff: pd.DataFrame, year: int, title: str,
+                 mode: str = "full") -> go.Figure:
     """
-    Build a three-tier Sankey: Major → Industry → Census Division.
-    An NME node is added per major for graduates with no/marginal employment.
-    dff must be already filtered by state / cohort / majors.
+    Multi-mode Sankey with optional In-State / Out-of-State granularity.
+
+    Modes
+    -----
+    "industry"  : Major → Industry  (2-tier)
+    "geography" : Major → Geography (2-tier, In-State / Division targets)
+    "full"      : Major → Industry → Geography (3-tier)
+
+    Accepts both the *granular* dataset (target_node + y*_count columns) and
+    the legacy flow file (division_label + y*_grads_emp).  NME nodes are added
+    per major for graduates with no / marginal employment.
     """
-    emp_col = FLOW_EMP_COLS[year]
-    nme_col = FLOW_NME_COLS[year]
+    is_granular = "target_node" in dff.columns
+    count_col = FLOW_COUNT_COLS[year] if is_granular else FLOW_EMP_COLS[year]
+    nme_col   = FLOW_NME_COLS[year]
+    geo_col   = "target_node" if is_granular else "division_label"
 
     majors     = sorted(dff["major_label"].dropna().unique().tolist())
     industries = sorted(dff["industry_label"].dropna().unique().tolist())
-    divisions  = sorted(dff["division_label"].dropna().unique().tolist())
+    geo_values = sorted(dff[geo_col].dropna().unique().tolist())
 
-    # ── Node index map ─────────────────────────────────────────────────────────
-    node_labels = []
-    node_colors = []
+    # ── Node registry ─────────────────────────────────────────────────────────
+    node_labels: list[str] = []
+    node_colors: list[str] = []
 
-    # Tier 1: Majors
-    maj_idx = {}
+    maj_idx: dict[str, int] = {}
     for m in majors:
         maj_idx[m] = len(node_labels)
         node_labels.append(m)
         node_colors.append(MAJOR_NODE_COLORS.get(m, "#888888"))
 
-    # NME nodes (one per major)
-    nme_idx = {}
+    nme_idx: dict[str, int] = {}
     for m in majors:
         nme_idx[m] = len(node_labels)
         node_labels.append(f"{m} — Not Observed / Marginal")
         node_colors.append(NME_COLOR)
 
-    # Tier 2: Industries
-    ind_idx = {}
-    for ind in industries:
-        ind_idx[ind] = len(node_labels)
-        node_labels.append(ind)
-        node_colors.append(INDUSTRY_COLORS.get(ind, "#888888"))
+    # Industry nodes (modes: industry, full)
+    ind_idx: dict[str, int] = {}
+    if mode in ("industry", "full"):
+        if mode == "full":
+            # Sort by volume to reduce visual tangling in the 3-tier layout
+            vol = (dff.groupby("industry_label")[count_col]
+                   .sum(min_count=1).fillna(0)
+                   .sort_values(ascending=False))
+            ordered_ind = vol.index.tolist()
+        else:
+            ordered_ind = industries
+        for ind in ordered_ind:
+            ind_idx[ind] = len(node_labels)
+            node_labels.append(ind)
+            node_colors.append(INDUSTRY_COLORS.get(ind, "#888888"))
 
-    # Tier 3: Divisions
-    div_idx = {}
-    for i, div in enumerate(divisions):
-        div_idx[div] = len(node_labels)
-        node_labels.append(div)
-        node_colors.append(DIVISION_COLORS[i % len(DIVISION_COLORS)])
+    # Geography / target nodes (modes: geography, full)
+    geo_idx: dict[str, int] = {}
+    if mode in ("geography", "full"):
+        unique_divs = sorted(dff["division_label"].dropna().unique().tolist())
+        div_clr = {d: DIVISION_COLORS[i % len(DIVISION_COLORS)]
+                   for i, d in enumerate(unique_divs)}
 
-    sources, targets, values, customdata = [], [], [], []
+        def _geo_key(n: str) -> tuple:
+            if "(In-State)" in n:
+                return (0, n)
+            if n.startswith("Other "):
+                return (2, n)
+            return (1, n)
 
-    # ── Tier 1 → Tier 2: Major → Industry ─────────────────────────────────────
-    # Each row is a unique (state, major, cohort, industry, division) observation.
-    # Summing over divisions gives total employment per (major, industry).
-    maj_ind = (
-        dff.groupby(["major_label", "industry_label"])[emp_col]
-        .sum(min_count=1)
-        .reset_index()
-        .dropna(subset=[emp_col])
-    )
-    for _, row in maj_ind.iterrows():
-        m   = row["major_label"]
-        ind = row["industry_label"]
-        val = float(row[emp_col])
-        if val <= 0:
-            continue
-        sources.append(maj_idx[m])
-        targets.append(ind_idx[ind])
-        values.append(val)
-        customdata.append(None)  # placeholder; filled after totals are known
+        for gn in sorted(geo_values, key=_geo_key):
+            geo_idx[gn] = len(node_labels)
+            node_labels.append(gn)
+            if "(In-State)" in gn:
+                node_colors.append(INSTATE_COLOR)
+            else:
+                base_div = gn.replace("Other ", "", 1) if gn.startswith("Other ") else gn
+                base = div_clr.get(base_div, "#888888")
+                if gn.startswith("Other "):
+                    r = int(int(base[1:3], 16) * 0.6)
+                    g = int(int(base[3:5], 16) * 0.6)
+                    b = int(int(base[5:7], 16) * 0.6)
+                    node_colors.append(f"#{r:02x}{g:02x}{b:02x}")
+                else:
+                    node_colors.append(base)
 
-    # ── Major → NME ───────────────────────────────────────────────────────────
-    # NME is a single value per (institution, major, cohort) but is repeated in
-    # every (industry × division) row.  Deduplicate before summing.
-    nme_key_cols = [c for c in ["institution", "major_label", "grad_cohort"] if c in dff.columns]
-    nme_dedup = (
-        dff[nme_key_cols + [nme_col]]
-        .drop_duplicates(subset=nme_key_cols)
-        .dropna(subset=[nme_col])
-    )
-    nme_by_maj = (
-        nme_dedup.groupby("major_label")[nme_col]
-        .sum(min_count=1)
-        .reset_index()
-        .dropna(subset=[nme_col])
-    )
-    for _, row in nme_by_maj.iterrows():
-        m   = row["major_label"]
-        val = float(row[nme_col])
-        if val <= 0 or m not in maj_idx:
+    sources:    list[int]            = []
+    targets:    list[int]            = []
+    values:     list[float]          = []
+    customdata: list[str | None]     = []
+
+    # ── Tier-1 links ──────────────────────────────────────────────────────────
+    if mode in ("industry", "full"):
+        agg = (dff.groupby(["major_label", "industry_label"])[count_col]
+               .sum(min_count=1).reset_index().dropna(subset=[count_col]))
+        for _, row in agg.iterrows():
+            v = float(row[count_col])
+            if v <= 0:
+                continue
+            sources.append(maj_idx[row["major_label"]])
+            targets.append(ind_idx[row["industry_label"]])
+            values.append(v)
+            customdata.append(None)
+
+    elif mode == "geography":
+        agg = (dff.groupby(["major_label", geo_col])[count_col]
+               .sum(min_count=1).reset_index().dropna(subset=[count_col]))
+        for _, row in agg.iterrows():
+            v = float(row[count_col])
+            if v <= 0:
+                continue
+            sources.append(maj_idx[row["major_label"]])
+            targets.append(geo_idx[row[geo_col]])
+            values.append(v)
+            customdata.append(None)
+
+    # ── Major → NME (deduplicated per institution × major × cohort) ───────────
+    nme_keys = [c for c in ("institution", "major_label", "grad_cohort")
+                if c in dff.columns]
+    nme_dd = (dff[nme_keys + [nme_col]]
+              .drop_duplicates(subset=nme_keys)
+              .dropna(subset=[nme_col]))
+    nme_agg = (nme_dd.groupby("major_label")[nme_col]
+               .sum(min_count=1).reset_index().dropna(subset=[nme_col]))
+    for _, row in nme_agg.iterrows():
+        m, v = row["major_label"], float(row[nme_col])
+        if v <= 0 or m not in maj_idx:
             continue
         sources.append(maj_idx[m])
         targets.append(nme_idx[m])
-        values.append(val)
-        customdata.append(None)  # placeholder
+        values.append(v)
+        customdata.append(None)
 
-    # ── Compute Major node outflow totals from actual link values ──────────────
-    # Percentage = link_value / sum_of_all_outgoing_links_from_that_major_node
-    maj_out_total = {}
+    # ── Back-fill percentage hover text for tier-1 + NME links ────────────────
+    out_tot: dict[str, float] = {}
     for s, v in zip(sources, values):
         lbl = node_labels[s]
-        maj_out_total[lbl] = maj_out_total.get(lbl, 0) + v
-
-    # Back-fill placeholders for tier-1 links
+        out_tot[lbl] = out_tot.get(lbl, 0) + v
     for i in range(len(customdata)):
         if customdata[i] is None:
-            src_lbl = node_labels[sources[i]]
-            tgt_lbl = node_labels[targets[i]]
-            val     = values[i]
-            total   = maj_out_total.get(src_lbl, 0)
-            pct     = (val / total * 100) if total > 0 else 0.0
-            customdata[i] = (
-                f"{src_lbl} → {tgt_lbl}<br>Count: {val:,.0f}<br>Percentage: {pct:.1f}%"
-            )
+            sl, tl = node_labels[sources[i]], node_labels[targets[i]]
+            v   = values[i]
+            tot = out_tot.get(sl, 0)
+            pct = (v / tot * 100) if tot > 0 else 0.0
+            customdata[i] = f"{sl} → {tl}<br>Count: {v:,.0f}<br>Share: {pct:.1f}%"
 
-    # ── Tier 2 → Tier 3: Industry → Division ──────────────────────────────────
-    ind_div = (
-        dff.groupby(["industry_label", "division_label"])[emp_col]
-        .sum(min_count=1)
-        .reset_index()
-        .dropna(subset=[emp_col])
-    )
-    # Compute totals from the grouped link values (not raw data) to stay consistent
-    ind_out_total = (
-        ind_div.groupby("industry_label")[emp_col]
-        .sum()
-        .to_dict()
-    )
-    for _, row in ind_div.iterrows():
-        ind = row["industry_label"]
-        div = row["division_label"]
-        val = float(row[emp_col])
-        if val <= 0:
-            continue
-        total = float(ind_out_total.get(ind, 0))
-        pct   = (val / total * 100) if total > 0 else 0.0
-        sources.append(ind_idx[ind])
-        targets.append(div_idx[div])
-        values.append(val)
-        customdata.append(f"{ind} → {div}<br>Count: {val:,.0f}<br>Percentage: {pct:.1f}%")
+    # ── Tier-2 links (full mode): Industry → Geography ────────────────────────
+    if mode == "full":
+        agg2 = (dff.groupby(["industry_label", geo_col])[count_col]
+                .sum(min_count=1).reset_index().dropna(subset=[count_col]))
+        ind_tot = agg2.groupby("industry_label")[count_col].sum().to_dict()
+        for _, row in agg2.iterrows():
+            v = float(row[count_col])
+            if v <= 0:
+                continue
+            ind, gn = row["industry_label"], row[geo_col]
+            tot = float(ind_tot.get(ind, 0))
+            pct = (v / tot * 100) if tot > 0 else 0.0
+            sources.append(ind_idx[ind])
+            targets.append(geo_idx[gn])
+            values.append(v)
+            customdata.append(
+                f"{ind} → {gn}<br>Count: {v:,.0f}<br>Share: {pct:.1f}%")
 
     if not sources:
         return None
 
-    # Link colors: inherit from source node with transparency
+    # ── Link colors (inherit source node color, translucent) ──────────────────
     link_colors = []
     for s in sources:
-        base = node_colors[s]
-        link_colors.append(base.replace("#", "rgba(").rstrip(")") if base.startswith("rgba") else
-                           f"rgba({int(base[1:3],16)},{int(base[3:5],16)},{int(base[5:7],16)},0.35)")
+        c = node_colors[s]
+        if c.startswith("rgba"):
+            link_colors.append(c)
+        else:
+            link_colors.append(
+                f"rgba({int(c[1:3],16)},{int(c[3:5],16)},{int(c[5:7],16)},0.35)")
+
+    mode_subtitle = {
+        "industry":  "Major → Industry",
+        "geography": "Major → Geography (In-State / Division)",
+        "full":      "Major → Industry → Geography (In-State / Division)",
+    }
 
     fig = go.Figure(go.Sankey(
         arrangement="snap",
         node=dict(
-            pad=18,
-            thickness=22,
+            pad=18, thickness=22,
             line=dict(color="#000000", width=0.5),
-            label=node_labels,
-            color=node_colors,
+            label=node_labels, color=node_colors,
             hovertemplate="%{label}<br>Total flow: %{value:,.0f}<extra></extra>",
         ),
         link=dict(
-            source=sources,
-            target=targets,
-            value=values,
-            color=link_colors,
-            customdata=customdata,
+            source=sources, target=targets, value=values,
+            color=link_colors, customdata=customdata,
             hovertemplate="%{customdata}<extra></extra>",
         ),
     ))
 
     fig.update_layout(
-        paper_bgcolor=BG_PAPER,
-        plot_bgcolor=BG_PAPER,
-        font=dict(
-            family="IBM Plex Sans, Inter, sans-serif",
-            color="#000000",   # bold black node labels
-            size=13,
-        ),
+        paper_bgcolor=BG_PAPER, plot_bgcolor=BG_PAPER,
+        font=dict(family="IBM Plex Sans, Inter, sans-serif",
+                  color=TEXT_CLR, size=13),
         title=dict(
             text=(
                 f"<b style='color:{TEXT_CLR}'>{title}</b>"
                 f"<br><sup><span style='color:#aaaaaa'>"
-                f"Major → Industry → Census Division &nbsp;·&nbsp; "
+                f"{mode_subtitle.get(mode, '')} · "
                 f"Agg 178, Degree 05, CIP 11/13/51"
                 f"</span></sup>"
             ),
             font=dict(size=20, color=TEXT_CLR),
             x=0, xanchor="left", pad=dict(b=12),
         ),
-        hoverlabel=dict(
-            bgcolor="#1e1e1e", bordercolor="#3a3a3a",
-            font=dict(color=TEXT_CLR, size=14),
-        ),
+        hoverlabel=dict(bgcolor="#1e1e1e", bordercolor="#3a3a3a",
+                        font=dict(color=TEXT_CLR, size=14)),
         margin=dict(l=20, r=20, t=100, b=20),
         height=700,
     )
@@ -898,10 +942,29 @@ with tab_earnings:
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_flows:
 
+    _use_granular = df_flow_g is not None
+
     st.markdown(
-        '<h2 class="chart-title">Employment Flows &nbsp;·&nbsp; Major → Industry → Census Division</h2>',
+        '<h2 class="chart-title">Employment Flows</h2>',
         unsafe_allow_html=True,
     )
+
+    # ── View Mode toggle (only when granular data is available) ───────────────
+    if _use_granular:
+        st.markdown('<div class="f-label">View Mode</div>', unsafe_allow_html=True)
+        _view_mode = st.radio(
+            "view_mode",
+            options=["Industry Only", "Geography Only", "Full Hierarchy (Both)"],
+            index=2,
+            label_visibility="collapsed",
+            horizontal=True,
+            key="view_mode",
+        )
+        s_mode = {"Industry Only": "industry", "Geography Only": "geography",
+                  "Full Hierarchy (Both)": "full"}[_view_mode]
+        st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
+    else:
+        s_mode = "full"
 
     # ── Filters ───────────────────────────────────────────────────────────────
     sf1, sf2, sf3, sf4 = st.columns([2, 2, 2, 2])
@@ -931,7 +994,7 @@ with tab_flows:
         s_cohort = st.selectbox(
             "s_cohort",
             options=["All Cohorts"] + flow_cohorts,
-            index=len(flow_cohorts),   # default to most recent cohort
+            index=len(flow_cohorts),
             label_visibility="collapsed",
             key="s_cohort",
         )
@@ -948,15 +1011,13 @@ with tab_flows:
         )
         s_year = {"1 Year": 1, "5 Years": 5, "10 Years": 10}[s_year_lbl]
 
-    # ── Filter data ───────────────────────────────────────────────────────────
-    dff_s = df_flow.copy()
+    # ── Select & filter data source ───────────────────────────────────────────
+    dff_s = (df_flow_g if _use_granular else df_flow).copy()
 
     if s_state != "All States":
         dff_s = dff_s[dff_s["state_name"] == s_state]
-
     if s_majors:
         dff_s = dff_s[dff_s["major_label"].isin(s_majors)]
-
     if s_cohort != "All Cohorts":
         dff_s = dff_s[dff_s["grad_cohort_label"] == s_cohort]
 
@@ -972,43 +1033,47 @@ with tab_flows:
             unsafe_allow_html=True,
         )
     else:
-        emp_col = FLOW_EMP_COLS[s_year]
-        has_emp = dff_s[emp_col].notna().any()
-        if not has_emp:
+        _count_col = FLOW_COUNT_COLS[s_year] if _use_granular else FLOW_EMP_COLS[s_year]
+        if not dff_s[_count_col].notna().any():
             st.markdown(
                 f'<div class="warn-box">⚠&nbsp; All employment counts are suppressed '
                 f'for {s_year_lbl} post-graduation with the current filters.</div>',
                 unsafe_allow_html=True,
             )
         else:
-            maj_str    = " · ".join(s_majors)
-            cohort_str = s_cohort
-            state_str  = s_state
-            sk_title   = f"{s_year_lbl} Post-Grad  |  {maj_str}  |  {state_str}  |  Cohort: {cohort_str}"
+            maj_str  = " · ".join(s_majors)
+            sk_title = (f"{s_year_lbl} Post-Grad  |  {maj_str}  |  "
+                        f"{s_state}  |  Cohort: {s_cohort}")
 
-            fig_sk = build_sankey(dff_s, s_year, sk_title)
+            fig_sk = build_sankey(dff_s, s_year, sk_title, mode=s_mode)
             if fig_sk is None:
                 st.markdown(
-                    '<div class="warn-box">⚠&nbsp; Insufficient non-zero flow data to render diagram.</div>',
+                    '<div class="warn-box">⚠&nbsp; Insufficient non-zero flow data '
+                    'to render diagram.</div>',
                     unsafe_allow_html=True,
                 )
             else:
                 st.plotly_chart(fig_sk, use_container_width=True)
 
-            # Meta row
             sm1, sm2, sm3, sm4 = st.columns(4)
             with sm1:
                 st.markdown(f'<div class="meta-label">Rows in view</div>'
-                            f'<div class="footer-val">{len(dff_s):,}</div>', unsafe_allow_html=True)
+                            f'<div class="footer-val">{len(dff_s):,}</div>',
+                            unsafe_allow_html=True)
             with sm2:
                 st.markdown(f'<div class="meta-label">States in view</div>'
-                            f'<div class="footer-val">{dff_s["state_name"].nunique()}</div>', unsafe_allow_html=True)
+                            f'<div class="footer-val">{dff_s["state_name"].nunique()}</div>',
+                            unsafe_allow_html=True)
             with sm3:
                 st.markdown(f'<div class="meta-label">Industries</div>'
-                            f'<div class="footer-val">{dff_s["industry_label"].nunique()}</div>', unsafe_allow_html=True)
+                            f'<div class="footer-val">{dff_s["industry_label"].nunique()}</div>',
+                            unsafe_allow_html=True)
             with sm4:
-                st.markdown(f'<div class="meta-label">Census Divisions</div>'
-                            f'<div class="footer-val">{dff_s["division_label"].nunique()}</div>', unsafe_allow_html=True)
+                _geo_label = "Target Nodes" if _use_granular else "Census Divisions"
+                _geo_col   = "target_node" if _use_granular else "division_label"
+                st.markdown(f'<div class="meta-label">{_geo_label}</div>'
+                            f'<div class="footer-val">{dff_s[_geo_col].nunique()}</div>',
+                            unsafe_allow_html=True)
 
     st.markdown("<hr>", unsafe_allow_html=True)
     st.markdown(

@@ -12,7 +12,7 @@
     * **Filtering:** **NO GLOBAL SIDEBAR.** Each visualization must have its own "Local Filter Bar" (using `st.columns`).
     * **Typography:** High-fidelity, clean, professional (IBM Plex Sans).
 
----
+--- 
 
 ## 2. Repository Architecture & Token Management
 **CRITICAL: TOKEN SAFETY PROTOCOL**

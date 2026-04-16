@@ -294,6 +294,14 @@ def apply_filters(base_df, cips, state, cohort):
     return out
 
 
+PLOTLY_CONFIG = {
+    "toImageButtonOptions": {
+        "format": "png",
+        "scale": 4,
+    },
+}
+
+
 def base_layout(title, subtitle):
     return dict(
         plot_bgcolor=BG_PLOT,
@@ -670,7 +678,7 @@ with tab_earnings:
         layout_b["legend"]["title"] = dict(text="Major — Percentile",
                                            font=dict(size=14, color="#555555"))
         fig_bar.update_layout(**layout_b)
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, use_container_width=True, config=PLOTLY_CONFIG)
 
         mc1, mc2, mc3 = st.columns(3)
         with mc1:
@@ -791,7 +799,7 @@ with tab_earnings:
                 layout_l["yaxis"]["dtick"] = 5000
 
         fig_line.update_layout(**layout_l)
-        st.plotly_chart(fig_line, use_container_width=True)
+        st.plotly_chart(fig_line, use_container_width=True, config=PLOTLY_CONFIG)
 
         lm1, lm2, lm3 = st.columns(3)
         with lm1:
@@ -939,7 +947,7 @@ with tab_earnings:
         layout_c["margin"]["b"] = 90
 
         fig_coh.update_layout(**layout_c)
-        st.plotly_chart(fig_coh, use_container_width=True)
+        st.plotly_chart(fig_coh, use_container_width=True, config=PLOTLY_CONFIG)
 
         cm1, cm2, cm3 = st.columns(3)
         with cm1:
@@ -1079,7 +1087,7 @@ with tab_flows:
                     unsafe_allow_html=True,
                 )
             else:
-                st.plotly_chart(fig_sk, use_container_width=True)
+                st.plotly_chart(fig_sk, use_container_width=True, config=PLOTLY_CONFIG)
 
             sm1, sm2, sm3, sm4 = st.columns(4)
             with sm1:
@@ -1305,7 +1313,7 @@ with tab_reg:
                 range=[y_min_reg - span * 0.15, y_max_reg + span * 0.30],
             )
 
-        st.plotly_chart(fig_reg, use_container_width=True)
+        st.plotly_chart(fig_reg, use_container_width=True, config=PLOTLY_CONFIG)
 
     # ── Footer meta row ───────────────────────────────────────────────────────
     st.markdown("<hr>", unsafe_allow_html=True)

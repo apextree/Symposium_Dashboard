@@ -1213,76 +1213,81 @@ with tab_reg:
         # )
 
     with chart_col:
+        # Filter coefficients for the selected percentile
         dff_reg = df_coef[df_coef["Percentile"] == reg_pct].copy()
         dff_reg["major"] = dff_reg["Major_Code"].astype(str).map(REG_CIP_LABEL)
 
-        YEAR_SYMBOLS = {1: "circle", 5: "diamond", 10: "circle"}
-        YEAR_SIZES   = {1: 12, 5: 10, 10: 18}
-        major_order  = ["Education", "Nursing", "Computer Science"]
+        x_label_map = {1: "1 Yr Post-Grad", 5: "5 Yrs Post-Grad", 10: "10 Yrs Post-Grad"}
 
         fig_reg = go.Figure()
 
-        for major_name in major_order:
+        # Baseline (zero line for Agriculture)
+        fig_reg.add_trace(go.Scatter(
+            name="Agriculture (Baseline)",
+            x=["1 Yr Post-Grad", "5 Yrs Post-Grad", "10 Yrs Post-Grad"],
+            y=[0, 0, 0],
+            mode="lines",
+            line=dict(color=BASELINE_COLOR, width=1.5, dash="dash"),
+            hovertemplate="Agriculture (CIP 01)<br>Baseline: $0<extra></extra>",
+        ))
+
+        all_reg_ys: list[float] = []
+
+        for major_name in ["Computer Science", "Nursing", "Education"]:
             sub = dff_reg[dff_reg["major"] == major_name].sort_values("year_after")
             if sub.empty:
                 continue
-            color    = REG_CIP_COLORS[major_name]
-            premiums = sub["Premium_USD"].tolist()
-            years    = sub["year_after"].tolist()
-            pvals    = sub["P_Value"].tolist()
+            color = REG_CIP_COLORS[major_name]
+            xs = [x_label_map[y] for y in sub["year_after"]]
+            ys = sub["Premium_USD"].tolist()
+            pvals = sub["P_Value"].tolist()
+            all_reg_ys.extend(ys)
+
+            def _sig_label(p):
+                if p < 0.001:
+                    return "*** (p < 0.001)"
+                elif p < 0.01:
+                    return f"** (p = {p:.4f})"
+                elif p < 0.05:
+                    return f"* (p = {p:.4f})"
+                else:
+                    return f"n.s. (p = {p:.3f})"
+
+            hover_texts = [
+                f"<b>{major_name}</b><br>"
+                f"{REG_PCT_LABELS[reg_pct]}<br>"
+                f"{xs[i]}<br>"
+                f"Premium: <b>${ys[i]:+,.0f}</b><br>"
+                f"Significance: {_sig_label(pvals[i])}"
+                for i in range(len(xs))
+            ]
+
+            REG_TEXT_POS = {
+                "Computer Science": "top center",
+                "Nursing":          "bottom center",
+                "Education":        "top right",
+            }
 
             fig_reg.add_trace(go.Scatter(
-                x=premiums,
-                y=[major_name] * len(premiums),
-                mode="lines",
-                line=dict(color=color, width=6),
-                showlegend=False,
-                hoverinfo="skip",
+                name=major_name,
+                x=xs,
+                y=ys,
+                mode="lines+markers+text",
+                line=dict(color=color, width=3),
+                marker=dict(
+                    color=color, size=11, symbol="circle",
+                    line=dict(color=BG_PLOT, width=2),
+                ),
+                text=[f"${v:+,.0f}" for v in ys],
+                textposition=REG_TEXT_POS.get(major_name, "top center"),
+                textfont=dict(size=13, color=color),
+                cliponaxis=False,
+                hovertemplate="%{customdata}<extra></extra>",
+                customdata=hover_texts,
             ))
 
-            for i, yr in enumerate(years):
-                prem, pval = premiums[i], pvals[i]
-                sig = ("***" if pval < 0.001
-                       else "**" if pval < 0.01
-                       else "*" if pval < 0.05
-                       else "n.s.")
-
-                show_label = yr in (1, 10)
-                text_val   = f"${prem:+,.0f}" if show_label else ""
-                tpos       = "top center" if yr == 10 else "bottom center"
-
-                marker_opacity = 1.0 if yr != 5 else 0.7
-
-                fig_reg.add_trace(go.Scatter(
-                    x=[prem],
-                    y=[major_name],
-                    mode="markers+text",
-                    marker=dict(
-                        color=color, size=YEAR_SIZES[yr],
-                        symbol=YEAR_SYMBOLS[yr],
-                        opacity=marker_opacity,
-                        line=dict(color=BG_PLOT, width=2),
-                    ),
-                    text=[text_val],
-                    textposition=tpos,
-                    textfont=dict(size=13, color=color, family="IBM Plex Sans, Inter, sans-serif"),
-                    cliponaxis=False,
-                    showlegend=False,
-                    hovertemplate=(
-                        f"<b>{major_name}</b> | Year {yr}<br>"
-                        f"Premium: <b>${prem:+,.0f}</b><br>"
-                        f"p = {pval:.2e} ({sig})<br>"
-                        f"{REG_PCT_LABELS[reg_pct]}"
-                        f"<extra></extra>"
-                    ),
-                ))
-
-        pct_title  = REG_PCT_LABELS[reg_pct]
-        all_prems  = dff_reg["Premium_USD"].dropna().tolist() + [0]
-        x_lo, x_hi = min(all_prems), max(all_prems)
-        x_span     = x_hi - x_lo
-        x_range    = [x_lo - x_span * 0.12, x_hi + x_span * 0.18]
-
+        # Layout
+        pct_title = REG_PCT_LABELS[reg_pct]
         fig_reg.update_layout(
             plot_bgcolor=BG_PLOT,
             paper_bgcolor=BG_PAPER,
@@ -1290,47 +1295,51 @@ with tab_reg:
             title=dict(
                 text=(
                     f"<b style='color:{TEXT_CLR}'>Wage Premium vs. Agriculture (CIP 01) — {pct_title}</b>"
-                    f"<br><sup><span style='color:#777777'>OLS β · State & cohort FE · "
-                    f"763 obs &nbsp;·&nbsp; ● Yr 1 &nbsp; ◆ Yr 5 &nbsp; ● Yr 10</span></sup>"
+                    f"<br><sup><span style='color:#777777'>OLS β coefficients · "
+                    f"State & cohort fixed effects · 763 observations</span></sup>"
                 ),
                 font=dict(size=20, color=TEXT_CLR),
                 x=0, xanchor="left", pad=dict(b=18),
             ),
             xaxis=dict(
-                title=dict(text="Wage Premium over Agriculture (USD)",
-                           font=dict(size=14, color="#555555")),
+                title=dict(text="Years After Graduation", font=dict(size=14, color="#555555")),
+                tickfont=dict(size=15, color=TEXT_CLR),
+                showgrid=False, showline=True,
+                linecolor=LINE_CLR, ticks="outside",
+                ticklen=5, tickcolor=AXIS_CLR,
+                categoryorder="array",
+                categoryarray=["1 Yr Post-Grad", "5 Yrs Post-Grad", "10 Yrs Post-Grad"],
+            ),
+            yaxis=dict(
+                title=dict(text="Wage Premium (USD)", font=dict(size=14, color="#555555")),
                 tickformat="$+,.0f",
                 tickfont=dict(size=14, color=TEXT_CLR),
+                dtick=10000,
                 showgrid=True, gridcolor=GRID_CLR, gridwidth=1,
                 showline=True, linecolor=LINE_CLR,
                 ticks="outside", ticklen=5, tickcolor=AXIS_CLR,
-                zeroline=True, zerolinecolor="#999999", zerolinewidth=1.5,
-                range=x_range,
+                zeroline=True, zerolinecolor="#cccccc", zerolinewidth=1,
             ),
-            yaxis=dict(
-                tickfont=dict(size=16, color=TEXT_CLR),
-                showgrid=False,
-                showline=False,
-                categoryorder="array",
-                categoryarray=major_order,
+            legend=dict(
+                font=dict(size=14, color=TEXT_CLR),
+                bgcolor="#f8f8f8", bordercolor="#dddddd", borderwidth=1,
+                orientation="v", x=1.01, xanchor="left", y=1.0, yanchor="top",
             ),
             hoverlabel=dict(
                 bgcolor="#ffffff", bordercolor="#cccccc",
                 font=dict(color=TEXT_CLR, size=14),
             ),
-            showlegend=False,
-            margin=dict(l=180, r=60, t=110, b=80),
-            height=420,
+            margin=dict(l=90, r=200, t=110, b=80),
+            height=750,
         )
 
-        fig_reg.add_annotation(
-            x=0, y=-0.5, xref="x", yref="y",
-            text="▲ Agriculture baseline ($0)",
-            showarrow=False,
-            font=dict(size=10, color="#999999",
-                      family="IBM Plex Sans, Inter, sans-serif"),
-            xanchor="center", yanchor="top",
-        )
+        if all_reg_ys:
+            y_min_reg = min(all_reg_ys + [0])
+            y_max_reg = max(all_reg_ys + [0])
+            span = y_max_reg - y_min_reg
+            fig_reg.update_yaxes(
+                range=[y_min_reg - span * 0.20, y_max_reg + span * 0.35],
+            )
 
         st.plotly_chart(fig_reg, use_container_width=True, config=PLOTLY_CONFIG)
 
@@ -1375,3 +1384,4 @@ with tab_reg:
     )
 
     #git check
+    

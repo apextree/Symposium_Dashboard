@@ -746,6 +746,8 @@ with tab_earnings:
 
         x_labels = {1: "1 Yr Post-Grad", 5: "5 Yrs Post-Grad", 10: "10 Yrs Post-Grad"}
 
+        TRAJ_TEXT_POS = {11: "top center", 13: "top center", 51: "bottom center"}
+
         fig_line = go.Figure()
         for cip in sorted(l_cips):
             sub = line_df[line_df["cipcode"] == cip].sort_values("year")
@@ -764,8 +766,9 @@ with tab_earnings:
                 marker=dict(color=color, size=8, symbol="circle",
                             line=dict(color=BG_PLOT, width=1.5)),
                 text=labels,
-                textposition="top center",
+                textposition=TRAJ_TEXT_POS.get(cip, "top center"),
                 textfont=dict(size=12, color=color),
+                cliponaxis=False,
                 hovertemplate=(
                     f"<b>{short}</b><br>"
                     f"{PCT_LABELS[l_pct]}<br>"
@@ -795,7 +798,7 @@ with tab_earnings:
             y_lo, y_hi = all_vals.min(), all_vals.max()
             span = y_hi - y_lo
             if span > 0:
-                layout_l["yaxis"]["range"] = [y_lo - span * 0.20, y_hi + span * 0.20]
+                layout_l["yaxis"]["range"] = [y_lo - span * 0.25, y_hi + span * 0.25]
                 layout_l["yaxis"]["dtick"] = 5000
 
         fig_line.update_layout(**layout_l)
@@ -887,7 +890,14 @@ with tab_earnings:
             (51, 10): "#67000d",
         }
 
+        COHORT_POS_CYCLE = [
+            "top center", "bottom center", "top right",
+            "bottom right", "top left", "bottom left",
+            "middle right", "middle left", "top center",
+        ]
+
         fig_coh = go.Figure()
+        _trace_idx = 0
 
         for cip in sorted(c_cips):
             sub_cip = dff_c[dff_c["cipcode"] == cip]
@@ -905,6 +915,8 @@ with tab_earnings:
                     continue
                 color = MAJOR_YEAR_COLORS.get((cip, yr), MAJOR_COLOR[cip])
                 labels = [f"${v:,.0f}" if pd.notna(v) else "" for v in agg_c["value"]]
+                tpos = COHORT_POS_CYCLE[_trace_idx % len(COHORT_POS_CYCLE)]
+                _trace_idx += 1
                 fig_coh.add_trace(go.Scatter(
                     name=f"{short} — {YEAR_LABEL[yr]}",
                     x=agg_c["cohort"],
@@ -914,8 +926,9 @@ with tab_earnings:
                     marker=dict(color=color, size=6, symbol="circle",
                                 line=dict(color=BG_PLOT, width=1)),
                     text=labels,
-                    textposition="top center",
+                    textposition=tpos,
                     textfont=dict(size=10, color=color),
+                    cliponaxis=False,
                     hovertemplate=(
                         f"<b>{short} · {YEAR_LABEL[yr]} Post-Grad</b><br>"
                         f"{PCT_LABELS[c_pct]}<br>"
@@ -1048,8 +1061,12 @@ with tab_flows:
     # ── Select & filter data source ───────────────────────────────────────────
     dff_s = (df_flow_g if _use_granular else df_flow).copy()
 
+    _collapsed_to_division = False
     if s_state != "All States":
         dff_s = dff_s[dff_s["state_name"] == s_state]
+    elif _use_granular:
+        dff_s["target_node"] = dff_s["division_label"]
+        _collapsed_to_division = True
     if s_majors:
         dff_s = dff_s[dff_s["major_label"].isin(s_majors)]
     if s_cohort != "All Cohorts":
@@ -1103,8 +1120,12 @@ with tab_flows:
                             f'<div class="footer-val">{dff_s["industry_label"].nunique()}</div>',
                             unsafe_allow_html=True)
             with sm4:
-                _geo_label = "Target Nodes" if _use_granular else "Census Divisions"
-                _geo_col   = "target_node" if _use_granular else "division_label"
+                if _use_granular and not _collapsed_to_division:
+                    _geo_label = "Target Nodes"
+                    _geo_col   = "target_node"
+                else:
+                    _geo_label = "Census Divisions"
+                    _geo_col   = "division_label"
                 st.markdown(f'<div class="meta-label">{_geo_label}</div>'
                             f'<div class="footer-val">{dff_s[_geo_col].nunique()}</div>',
                             unsafe_allow_html=True)
@@ -1241,6 +1262,12 @@ with tab_reg:
                 for i in range(len(xs))
             ]
 
+            REG_TEXT_POS = {
+                "Computer Science": "top center",
+                "Nursing":          "bottom center",
+                "Education":        "top right",
+            }
+
             fig_reg.add_trace(go.Scatter(
                 name=major_name,
                 x=xs,
@@ -1252,8 +1279,9 @@ with tab_reg:
                     line=dict(color=BG_PLOT, width=2),
                 ),
                 text=[f"${v:+,.0f}" for v in ys],
-                textposition="top center",
+                textposition=REG_TEXT_POS.get(major_name, "top center"),
                 textfont=dict(size=13, color=color),
+                cliponaxis=False,
                 hovertemplate="%{customdata}<extra></extra>",
                 customdata=hover_texts,
             ))
@@ -1310,7 +1338,7 @@ with tab_reg:
             y_max_reg = max(all_reg_ys + [0])
             span = y_max_reg - y_min_reg
             fig_reg.update_yaxes(
-                range=[y_min_reg - span * 0.15, y_max_reg + span * 0.30],
+                range=[y_min_reg - span * 0.20, y_max_reg + span * 0.35],
             )
 
         st.plotly_chart(fig_reg, use_container_width=True, config=PLOTLY_CONFIG)

@@ -1143,11 +1143,11 @@ with tab_flows:
 with tab_reg:
 
     # ── Constants for this tab ────────────────────────────────────────────────
-    REG_CIP_LABEL = {"11": "Computer Science", "13": "Education", "51": "Nursing"}
+    REG_CIP_LABEL = {"11": "Computer Science", "13": "Education", "51": "Health Professions"}
     REG_CIP_COLORS = {
         "Computer Science": "#0077b6",
         "Education":        "#d32f2f",
-        "Nursing":          "#2e7d32",
+        "Health Professions": "#2e7d32",
     }
     BASELINE_COLOR = "#aaaaaa"
     REG_PCT_OPTIONS = {
@@ -1192,7 +1192,7 @@ with tab_reg:
         #     "<p style='font-size:0.82rem; color:#cccccc; font-weight:600; margin-bottom:0.3rem;'>"
         #     "The Scissors Effect</p>"
         #     "<p style='font-size:0.78rem; color:#999999; line-height:1.55;'>"
-        #     "Observe how technical premiums (CS / Nursing) <b style='color:#e8e8e8;'>accelerate</b> "
+        #     "Observe how technical premiums (CS / Health Professions) <b style='color:#e8e8e8;'>accelerate</b> "
         #     "with experience. In contrast, Education exhibits "
         #     "<b style='color:#ff4b4b;'>Compressed Returns</b> — where the market fails to reward "
         #     "10 years of experience with a significant wage increase.</p>"
@@ -1233,7 +1233,7 @@ with tab_reg:
 
         all_reg_ys: list[float] = []
 
-        for major_name in ["Computer Science", "Nursing", "Education"]:
+        for major_name in ["Computer Science", "Health Professions", "Education"]:
             sub = dff_reg[dff_reg["major"] == major_name].sort_values("year_after")
             if sub.empty:
                 continue
@@ -1264,7 +1264,7 @@ with tab_reg:
 
             REG_TEXT_POS = {
                 "Computer Science": "top center",
-                "Nursing":          "bottom center",
+                "Health Professions": "bottom center",
                 "Education":        "top right",
             }
 
@@ -1378,7 +1378,7 @@ with tab_reg:
         "Post-Secondary Employment Outcomes (PSEO) · U.S. Census Bureau · "
         "OLS coefficients with State & Cohort suppression · "
         "CIP 01 Agriculture (Baseline) · CIP 11 Computer Science · "
-        "CIP 13 Education · CIP 51 Nursing"
+        "CIP 13 Education · CIP 51 Health Professions"
         "</p>",
         unsafe_allow_html=True,
     )
